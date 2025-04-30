@@ -1,0 +1,216 @@
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
+from django.contrib.auth.hashers import make_password
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
+import jwt
+from .serializers import *
+from .models import Company, Staff
+from datetime import timedelta
+from django.shortcuts import get_object_or_404
+
+class BaseAPIView(APIView):
+    """
+    Base API view to handle common response structures.
+    """
+
+    def success_response(self, message, data=None, status_code=status.HTTP_200_OK):
+        return Response({"message": message,"data": data},status=status_code)
+
+    def error_response(self, message, details=None, status_code=status.HTTP_400_BAD_REQUEST):
+        return Response({"message": message,"details": details},status=status_code)
+    
+
+    def authentication(self, request):
+        """
+        Validates the JWT token passed in the Authorization header.
+        Returns the decoded token or raises an error if invalid.
+        """
+        try:
+            # Get the token from the Authorization header
+            auth_user = request.headers.get('Authorization')
+            print(f"Authorization header: {auth_user}")
+
+            if auth_user is None:
+                print("Authorization token is missing.")
+                raise Exception("Authorization token is missing.")
+            
+            # Remove the "Bearer " part from the token if it's there
+            if auth_user.startswith("Bearer "):
+                token = auth_user.split(" ")[1]  # Extract the token
+            else:
+                raise Exception("Invalid token format. Expected Bearer token.")
+
+            # Decode the token
+            try:
+                decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
+                return decoded_token  # Return decoded token if valid
+            except jwt.ExpiredSignatureError:
+                raise Exception("Token has expired.")
+            except jwt.InvalidTokenError:
+                raise Exception("Invalid token.")
+            
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            raise Exception(f"Authentication failed: {str(e)}")
+
+
+class RegisterCompanyView(BaseAPIView):
+    """
+    API view to handle the registration of a new company and create an admin staff.
+    """
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        """
+        Handles POST requests to register a new company.
+        """
+        serializer = CompanySerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return self.error_response(
+                "Invalid input.",
+                details=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            company = serializer.save()
+
+            # Validate Admin Staff Inputs
+            admin_name = request.data.get('admin_name')
+            admin_email = request.data.get('admin_email')
+            admin_password = request.data.get('admin_password')
+
+            if not (admin_name and admin_email and admin_password):
+                return self.error_response(
+                    "Admin staff details are missing.",
+                    details={"admin_name": "required", "admin_email": "required", "admin_password": "required"},
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Create Admin Staff
+            Staff.objects.create(
+                company=company,
+                name=admin_name,
+                email=admin_email,
+                password=make_password(admin_password),
+                role='admin',
+            )
+
+            return self.success_response(
+                "Company and Admin Staff registered successfully!",
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED
+            )
+
+        except Exception as error:
+            print(error)
+            return self.error_response(
+                "An unexpected error occurred while saving the company and staff.",
+                details=str(error),
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class CompanyStaffAuthenticationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            password = request.data.get('password')
+
+            if not email or not password:
+                return Response({"status": "error", "message": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            try:
+                staff = Staff.objects.get(email=email)
+            except Staff.DoesNotExist:
+                return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            # Check password
+            if not staff.check_password(password):
+                return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            # Create JWT Token
+            refresh = RefreshToken.for_user(staff)
+            access_token = str(refresh.access_token)
+
+            # Get the expiration time of the access token (in Unix timestamp format)
+            access_token_expiration = refresh.access_token['exp']
+
+            return Response({
+                "status": "success",
+                "message": "Login successful.",
+                "refresh": str(refresh),
+                "access": access_token,
+                "access_token_expiration": access_token_expiration,  # Add expiration time
+                "user": {
+                    "id": staff.pk,
+                    "name": staff.name,
+                    "email": staff.email,
+                    "role": staff.role,
+                    "company_id": staff.company.pk,
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({"status": "error", "message": "Something went wrong.", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class ListAllStaffByCompany(BaseAPIView):
+    def get(self, request):
+        try:
+            auth_user = self.authentication(request)
+            user_id = auth_user.get('user_id')
+
+            if not user_id:
+                return Response({"status": "error"},status=status.HTTP_400_BAD_REQUEST)
+
+            staff_member = Staff.objects.select_related('company').get(pk=user_id)
+            if staff_member.role == "admin":
+                serializer = CompanyStaffSerializers(staff_member.company)
+                return Response({"status": "success","data": serializer.data},status=status.HTTP_200_OK)
+            else:
+                return Response(
+                    {"message": "Permission denied. Only admins can view this data."},status=status.HTTP_403_FORBIDDEN)
+        except Staff.DoesNotExist:
+            return Response({"status": "error"},status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"status": "error", "message": f"{str(e)}"},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class EditStaffProfile(BaseAPIView):
+    def put(self, request):
+        # Get the authenticated user
+        auth_user = self.authentication(request)
+        
+        # Get the staff ID (user_id) from the authenticated user
+        staff_id = auth_user.get('user_id')
+        if not staff_id:
+            return Response({"detail": "User ID is missing"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Fetch the staff member by the authenticated user ID
+            staff = Staff.objects.get(id=staff_id)
+        except Staff.DoesNotExist:
+            return Response({"detail": "Staff member not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Use the serializer to validate and update the staff data
+        serializer = StaffSerializer(staff, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()  # Save the updated staff data
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+        # If the serializer is not valid, return the validation errors
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+
+# class ForgottPasswordVIew()
