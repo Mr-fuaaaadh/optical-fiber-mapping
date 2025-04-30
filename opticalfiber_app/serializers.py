@@ -1,0 +1,18 @@
+from rest_framework import serializers
+from .models import Company, Staff
+
+class CompanySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Company
+        fields = '__all__'
+
+class StaffSerializer(serializers.ModelSerializer):
+    class Meta :
+        model = Staff
+        fields = "__all__"
+
+class CompanyStaffSerializers(serializers.ModelSerializer):
+    staffs = StaffSerializer(many=True, read_only=True)  # important: many=True because one company -> many staffs
+    class Meta:
+        model = Company
+        fields = "__all__"
