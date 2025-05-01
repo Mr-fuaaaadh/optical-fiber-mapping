@@ -12,6 +12,7 @@ from .models import Company, Staff, OTP
 from datetime import timedelta, datetime
 from django.shortcuts import get_object_or_404
 from .utils import OTPService
+from .tokens import get_tokens_for_user 
 
 from django.db import transaction
 
@@ -35,30 +36,26 @@ class BaseAPIView(APIView):
         try:
             # Get the token from the Authorization header
             auth_user = request.headers.get('Authorization')
-            print(f"Authorization header: {auth_user}")
-
             if auth_user is None:
-                print("Authorization token is missing.")
-                raise Exception("Authorization token is missing.")
+                return Response({"Authorization token is missing."}, status=status.HTTP_401_UNAUTHORIZED)
             
             # Remove the "Bearer " part from the token if it's there
             if auth_user.startswith("Bearer "):
                 token = auth_user.split(" ")[1]  # Extract the token
             else:
-                raise Exception("Invalid token format. Expected Bearer token.")
+                return Response({"Invalid token format. Expected Bearer token."}, status=status.HTTP_401_UNAUTHORIZED)
 
             # Decode the token
             try:
                 decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
                 return decoded_token  # Return decoded token if valid
             except jwt.ExpiredSignatureError:
-                raise Exception("Token has expired.")
+                return Response({"Token has expired."})
             except jwt.InvalidTokenError:
-                raise Exception("Invalid token.")
+                return Response({"Invalid token."})
             
         except Exception as e:
-            print(f"Error: {str(e)}")
-            raise Exception(f"Authentication failed: {str(e)}")
+            return Response({f"Authentication failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class RegisterCompanyView(BaseAPIView):
@@ -139,23 +136,16 @@ class CompanyStaffAuthenticationView(APIView):
             except Staff.DoesNotExist:
                 return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Check password
             if not staff.check_password(password):
                 return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Create JWT Token
-            refresh = RefreshToken.for_user(staff)
-            access_token = str(refresh.access_token)
-
-            # Get the expiration time of the access token (in Unix timestamp format)
-            access_token_expiration = refresh.access_token['exp']
+            # Generate token with company_id inside
+            token_data = get_tokens_for_user(staff)
 
             return Response({
                 "status": "success",
                 "message": "Login successful.",
-                "refresh": str(refresh),
-                "access": access_token,
-                "access_token_expiration": access_token_expiration,  # Add expiration time
+                **token_data,
                 "user": {
                     "id": staff.pk,
                     "name": staff.name,

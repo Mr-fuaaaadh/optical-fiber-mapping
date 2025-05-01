@@ -7,6 +7,7 @@ class OfficeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Office
         fields = '__all__'  # Include all fields from the Office model
+        read_only_fields = ['company', 'created_at']
 
     def create(self, validated_data):
         """
