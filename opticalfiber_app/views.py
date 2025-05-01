@@ -8,9 +8,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.conf import settings
 import jwt
 from .serializers import *
-from .models import Company, Staff
-from datetime import timedelta
+from .models import Company, Staff, OTP
+from datetime import timedelta, datetime
 from django.shortcuts import get_object_or_404
+from .utils import OTPService
+
+from django.db import transaction
 
 class BaseAPIView(APIView):
     """
@@ -60,46 +63,50 @@ class BaseAPIView(APIView):
 
 class RegisterCompanyView(BaseAPIView):
     """
-    API view to handle the registration of a new company and create an admin staff.
+    API view to handle the registration of a new company and its admin staff.
     """
     permission_classes = [AllowAny]
 
     def post(self, request):
-        """
-        Handles POST requests to register a new company.
-        """
-        serializer = CompanySerializer(data=request.data)
+        # Validate Admin Staff Inputs First
+        admin_name = request.data.get('admin_name')
+        admin_email = request.data.get('admin_email')
+        admin_password = request.data.get('admin_password')
 
+        if not (admin_name and admin_email and admin_password):
+            return self.error_response(
+                "Admin staff details are required before registering the company.",
+                details={
+                    "admin_name": "required",
+                    "admin_email": "required",
+                    "admin_password": "required"
+                },
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate Company Inputs
+        serializer = CompanySerializer(data=request.data)
         if not serializer.is_valid():
             return self.error_response(
-                "Invalid input.",
+                "Invalid company input.",
                 details=serializer.errors,
                 status_code=status.HTTP_400_BAD_REQUEST
             )
 
         try:
-            company = serializer.save()
+            # Using a transaction to ensure everything is saved together
+            with transaction.atomic():
+                # Save company data
+                company = serializer.save()
 
-            # Validate Admin Staff Inputs
-            admin_name = request.data.get('admin_name')
-            admin_email = request.data.get('admin_email')
-            admin_password = request.data.get('admin_password')
-
-            if not (admin_name and admin_email and admin_password):
-                return self.error_response(
-                    "Admin staff details are missing.",
-                    details={"admin_name": "required", "admin_email": "required", "admin_password": "required"},
-                    status_code=status.HTTP_400_BAD_REQUEST
+                # Save admin staff after validating the company
+                Staff.objects.create(
+                    company=company,
+                    name=admin_name,
+                    email=admin_email,
+                    password=make_password(admin_password),
+                    role='admin',
                 )
-
-            # Create Admin Staff
-            Staff.objects.create(
-                company=company,
-                name=admin_name,
-                email=admin_email,
-                password=make_password(admin_password),
-                role='admin',
-            )
 
             return self.success_response(
                 "Company and Admin Staff registered successfully!",
@@ -108,9 +115,9 @@ class RegisterCompanyView(BaseAPIView):
             )
 
         except Exception as error:
-            print(error)
+            # In case of any exception, the transaction is rolled back, nothing is saved.
             return self.error_response(
-                "An unexpected error occurred while saving the company and staff.",
+                "An unexpected error occurred while registering company and admin.",
                 details=str(error),
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
@@ -213,4 +220,85 @@ class EditStaffProfile(BaseAPIView):
     
 
 
-# class ForgottPasswordVIew()
+class ForgotPasswordView(BaseAPIView):
+    def post(self, request):
+        email = request.data.get('email')
+
+        if not email:
+            return self.error_response("Email is required.", status.HTTP_400_BAD_REQUEST)
+
+        try:
+            staff = Staff.objects.get(email=email, is_active=True)
+        except Staff.DoesNotExist:
+            return self.error_response("Email not found.", status.HTTP_404_NOT_FOUND)
+
+        try:
+            # Generate OTP
+            otp_code = OTPService.generate_otp()
+
+            # Save OTP to OTP model (automatically handles expiry)
+            OTP.objects.create(
+                email=email,
+                otp=otp_code
+                # expires_at is set automatically in OTP model's save()
+            )
+
+            # Send OTP via email
+            OTPService.send_otp_email(staff.name, staff.email, otp_code)
+
+        except Exception as e:
+            return self.error_response(f"Failed to send OTP: {str(e)}", status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response({
+            "status": "success",
+            "message": "OTP has been sent to your email."
+        }, status=status.HTTP_200_OK)
+
+    
+
+
+class VerifyOTPView(BaseAPIView):
+    def post(self, request):
+        email = request.data.get('email')
+        otp_code = request.data.get('otp')
+
+        if not email or not otp_code:
+            return self.error_response("Email and OTP are required.", status.HTTP_400_BAD_REQUEST)
+
+        try:
+            valid, message = OTPService.verify_otp(email, otp_code)
+
+            if not valid:
+                return self.error_response(message, status.HTTP_400_BAD_REQUEST)
+
+            return Response({
+                "status": "success",
+                "message": message
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return self.error_response(f"An error occurred: {str(e)}", status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class ResetPasswordView(BaseAPIView):
+    def post(self, request):
+        email = request.data.get('email')
+        new_password = request.data.get('new_password')
+
+        if not email or not new_password:
+            return self.error_response("Email and new password are required.", status.HTTP_400_BAD_REQUEST)
+
+        try:
+            staff = Staff.objects.get(email=email, is_active=True)
+            staff.password = make_password(new_password)
+            staff.save()
+
+            return Response({
+                "status": "success",
+                "message": "Password reset successfully."
+            }, status=status.HTTP_200_OK)
+
+        except Staff.DoesNotExist:
+            return self.error_response("Email not found.", status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return self.error_response(f"An error occurred: {str(e)}", status.HTTP_500_INTERNAL_SERVER_ERROR)
