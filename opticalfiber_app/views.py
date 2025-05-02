@@ -13,6 +13,11 @@ from datetime import timedelta, datetime
 from django.shortcuts import get_object_or_404
 from .utils import OTPService
 from .tokens import get_tokens_for_user 
+from django.db import DatabaseError
+from django.core.exceptions import ObjectDoesNotExist
+import logging
+
+logger = logging.getLogger(__name__)
 
 from django.db import transaction
 
@@ -26,6 +31,17 @@ class BaseAPIView(APIView):
 
     def error_response(self, message, details=None, status_code=status.HTTP_400_BAD_REQUEST):
         return Response({"message": message,"details": details},status=status_code)
+    
+    def handle_exception(self, e):
+        if isinstance(e, ObjectDoesNotExist):
+            logger.error(f"Object not found: {e}")
+            return self.error_response("Resource not found", status.HTTP_404_NOT_FOUND, details=str(e))
+        elif isinstance(e, DatabaseError):
+            logger.error(f"Database error: {e}")
+            return self.error_response("Database error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
+        else:
+            logger.exception("Unexpected error occurred")
+            return self.error_response("Unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
     
 
     def authentication(self, request):

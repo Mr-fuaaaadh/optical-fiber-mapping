@@ -1,0 +1,11 @@
+from django.urls import path
+from .views import *
+
+
+urlpatterns = [
+    path('add/', FiberRouteView.as_view(), name='route-add'),
+    path('list/', FiberRouteListView.as_view(), name='route-list'),
+    path('management/<int:route_id>/', FiberRouteManagementView.as_view(), name='route-management'),
+    path('management/<int:route_id>/delete/', FiberRouteManagementView.as_view(), name='route-management-delete'),
+    path('management/<int:route_id>/update/', FiberRouteManagementView.as_view(), name='route-management-update'),
+]

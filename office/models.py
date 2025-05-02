@@ -3,15 +3,9 @@ from opticalfiber_app.models import Company
 # Create your models here.
 
 class Office(models.Model):
-    OFFICE_TYPES = (
-        ('head', 'Head Office'),
-        ('branch', 'Branch'),
-        ('service', 'Service Center'),
-    )
 
     company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='offices')
     name = models.CharField(max_length=255)
-    type = models.CharField(max_length=50, choices=OFFICE_TYPES, default='branch')
     latitude = models.FloatField()
     longitude = models.FloatField()
     address = models.TextField()
@@ -21,3 +15,37 @@ class Office(models.Model):
     class Meta:
         verbose_name = 'Office'
         verbose_name_plural = 'Offices'
+
+
+
+class Branch(models.Model):
+    office = models.ForeignKey(Office, related_name='branches', on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    logitude = models.FloatField()
+    latitude = models.FloatField()
+    address = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Branch'
+        verbose_name_plural = 'Branches'
+        ordering = ['created_at']
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
