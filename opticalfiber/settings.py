@@ -41,6 +41,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'opticalfiber_app',
     'office',
+    'route_app',
+    'junction_app',
+    'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
 ]
