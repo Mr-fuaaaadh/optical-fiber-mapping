@@ -32,17 +32,7 @@ class BaseAPIView(APIView):
     def error_response(self, message, details=None, status_code=status.HTTP_400_BAD_REQUEST):
         return Response({"message": message,"details": details},status=status_code)
     
-    def handle_exception(self, e):
-        if isinstance(e, ObjectDoesNotExist):
-            logger.error(f"Object not found: {e}")
-            return self.error_response("Resource not found", status.HTTP_404_NOT_FOUND, details=str(e))
-        elif isinstance(e, DatabaseError):
-            logger.error(f"Database error: {e}")
-            return self.error_response("Database error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
-        else:
-            logger.exception("Unexpected error occurred")
-            return self.error_response("Unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
-    
+
 
     def authentication(self, request):
         """
@@ -200,29 +190,39 @@ class ListAllStaffByCompany(BaseAPIView):
 
 
 class EditStaffProfile(BaseAPIView):
-    def put(self, request):
-        # Get the authenticated user
+    
+    def get_authenticated_staff(self, request):
+        """
+        Encapsulate the logic to authenticate and fetch staff instance.
+        """
         auth_user = self.authentication(request)
-        
-        # Get the staff ID (user_id) from the authenticated user
-        staff_id = auth_user.get('user_id')
-        if not staff_id:
-            return Response({"detail": "User ID is missing"}, status=status.HTTP_400_BAD_REQUEST)
+        user_id = auth_user.get('user_id')
 
+        if not user_id:
+            raise ValueError("User ID not found")
+
+        return get_object_or_404(Staff, id=user_id)
+
+    def get(self, request):
         try:
-            # Fetch the staff member by the authenticated user ID
-            staff = Staff.objects.get(id=staff_id)
-        except Staff.DoesNotExist:
-            return Response({"detail": "Staff member not found"}, status=status.HTTP_404_NOT_FOUND)
-
-        # Use the serializer to validate and update the staff data
-        serializer = StaffSerializer(staff, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()  # Save the updated staff data
+            staff_instance = self.get_authenticated_staff(request)
+            serializer = StaffSerializer(staff_instance)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        
-        # If the serializer is not valid, return the validation errors
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request):
+        try:
+            staff_instance = self.get_authenticated_staff(request)
+            serializer = StaffSerializer(staff_instance, data=request.data, partial=True)
+
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
     
 
 

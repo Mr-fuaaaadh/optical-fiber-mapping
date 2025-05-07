@@ -12,7 +12,7 @@ class StaffSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 class CompanyStaffSerializers(serializers.ModelSerializer):
-    staffs = StaffSerializer(many=True, read_only=True)  # important: many=True because one company -> many staffs
+    staffs = StaffSerializer(many=True, read_only=True) 
     class Meta:
         model = Company
         fields = "__all__"
