@@ -19,7 +19,7 @@ class OfficeView(BaseAPIView):
             if not auth_user:
                 return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -46,7 +46,7 @@ class OfficeView(BaseAPIView):
             if not auth_user:
                 return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -68,7 +68,7 @@ class OfficeManagementView(BaseAPIView):
             if not auth_user:
                 return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -94,7 +94,7 @@ class OfficeManagementView(BaseAPIView):
             if not auth_user:
                 return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -121,7 +121,7 @@ class OfficeManagementView(BaseAPIView):
             if not auth_user:
                 return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -188,7 +188,7 @@ class BranchView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
 
@@ -213,7 +213,7 @@ class BranchManagementView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
 
@@ -234,7 +234,7 @@ class BranchManagementView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 return self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
 

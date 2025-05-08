@@ -12,11 +12,10 @@ from .models import Company, Staff, OTP
 from datetime import timedelta, datetime
 from django.shortcuts import get_object_or_404
 from .utils import OTPService
-from .tokens import get_tokens_for_user 
 from django.db import DatabaseError
 from django.core.exceptions import ObjectDoesNotExist
 import logging
-
+from django.http import Http404
 logger = logging.getLogger(__name__)
 
 from django.db import transaction
@@ -31,7 +30,6 @@ class BaseAPIView(APIView):
 
     def error_response(self, message, details=None, status_code=status.HTTP_400_BAD_REQUEST):
         return Response({"message": message,"details": details},status=status_code)
-    
 
 
     def authentication(self, request):
@@ -40,28 +38,23 @@ class BaseAPIView(APIView):
         Returns the decoded token or raises an error if invalid.
         """
         try:
-            # Get the token from the Authorization header
             auth_user = request.headers.get('Authorization')
             if auth_user is None:
                 return Response({"Authorization token is missing."}, status=status.HTTP_401_UNAUTHORIZED)
             
-            # Remove the "Bearer " part from the token if it's there
-            if auth_user.startswith("Bearer "):
-                token = auth_user.split(" ")[1]  # Extract the token
-            else:
-                return Response({"Invalid token format. Expected Bearer token."}, status=status.HTTP_401_UNAUTHORIZED)
-
-            # Decode the token
             try:
-                decoded_token = jwt.decode(token, settings.SECRET_KEY, algorithms=['HS256'])
-                return decoded_token  # Return decoded token if valid
+                decoded_token = jwt.decode(auth_user, settings.SECRET_KEY, algorithms=['HS256'])
+                if 'id' not in decoded_token:
+                    return Response({"detail": "Token has no id"}, status=status.HTTP_401_UNAUTHORIZED)
+                return decoded_token
             except jwt.ExpiredSignatureError:
-                return Response({"Token has expired."})
+                return Response({"Token has expired."}, status=status.HTTP_401_UNAUTHORIZED)
             except jwt.InvalidTokenError:
-                return Response({"Invalid token."})
+                return Response({"Invalid token."}, status=status.HTTP_401_UNAUTHORIZED)
             
         except Exception as e:
             return Response({f"Authentication failed: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class RegisterCompanyView(BaseAPIView):
@@ -127,42 +120,42 @@ class RegisterCompanyView(BaseAPIView):
 
 
 class CompanyStaffAuthenticationView(APIView):
-    permission_classes = [AllowAny]
+
+    class StaffLoginSerializer(serializers.Serializer):
+        email = serializers.EmailField()
+        password = serializers.CharField()
 
     def post(self, request):
+        serializer = self.StaffLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({"status": "error", "message": "Invalid input.", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data['email']
+        password = serializer.validated_data['password']
+
         try:
-            email = request.data.get('email')
-            password = request.data.get('password')
-
-            if not email or not password:
-                return Response({"status": "error", "message": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-            try:
-                staff = Staff.objects.get(email=email)
-            except Staff.DoesNotExist:
-                return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
-
+            staff = Staff.objects.get(email=email)
             if not staff.check_password(password):
-                return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+                raise ValueError("Invalid credentials.")
+        except (Staff.DoesNotExist, ValueError):
+            return Response({"status": "error", "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Generate token with company_id inside
-            token_data = get_tokens_for_user(staff)
+        expiration_time = datetime.utcnow() + timedelta(minutes=settings.JWT_EXPIRATION_MINUTES)
+        user_token = {
+            'id': staff.pk,
+            'company': staff.company.pk,
+            'name': staff.name,
+            'exp': expiration_time,
+            'iat': datetime.utcnow(),
+        }
+        token = jwt.encode(user_token, settings.SECRET_KEY, algorithm='HS256')
 
-            return Response({
-                "status": "success",
-                "message": "Login successful.",
-                **token_data,
-                "user": {
-                    "id": staff.pk,
-                    "name": staff.name,
-                    "email": staff.email,
-                    "role": staff.role,
-                    "company_id": staff.company.pk,
-                }
-            }, status=status.HTTP_200_OK)
+        return Response({
+            "status": "success",
+            "token": token,
+            "name": staff.name,
+        }, status=status.HTTP_200_OK)
 
-        except Exception as e:
-            return Response({"status": "error", "message": "Something went wrong.", "details": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -170,7 +163,7 @@ class ListAllStaffByCompany(BaseAPIView):
     def get(self, request):
         try:
             auth_user = self.authentication(request)
-            user_id = auth_user.get('user_id')
+            user_id = auth_user.get('id')
 
             if not user_id:
                 return Response({"status": "error"},status=status.HTTP_400_BAD_REQUEST)
@@ -190,24 +183,28 @@ class ListAllStaffByCompany(BaseAPIView):
 
 
 class EditStaffProfile(BaseAPIView):
-    
+
     def get_authenticated_staff(self, request):
         """
         Encapsulate the logic to authenticate and fetch staff instance.
         """
-        auth_user = self.authentication(request)
-        user_id = auth_user.get('user_id')
-
+        decoded_token = self.authentication(request)
+        user_id = decoded_token.get('id')
         if not user_id:
-            raise ValueError("User ID not found")
+            raise Exception("User ID not found in token.")
 
-        return get_object_or_404(Staff, id=user_id)
+        try:
+            return Staff.objects.get(id=user_id)
+        except Staff.DoesNotExist:
+            raise Http404("Staff not found")
 
     def get(self, request):
         try:
             staff_instance = self.get_authenticated_staff(request)
             serializer = StaffSerializer(staff_instance)
             return Response(serializer.data, status=status.HTTP_200_OK)
+        except Http404:
+            return Response({"detail": "Staff not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -218,11 +215,17 @@ class EditStaffProfile(BaseAPIView):
 
             if serializer.is_valid():
                 serializer.save()
+                logger.info(f"Staff profile updated for {staff_instance.name}")
                 return Response(serializer.data, status=status.HTTP_200_OK)
 
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Http404:
+            return Response({"detail": "Staff not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.error(f"Error updating profile: {str(e)}")
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
     
 
 
