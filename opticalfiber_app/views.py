@@ -30,6 +30,12 @@ class BaseAPIView(APIView):
 
     def error_response(self, message, details=None, status_code=status.HTTP_400_BAD_REQUEST):
         return Response({"message": message,"details": details},status=status_code)
+    
+    def permission_check(self, staff_member):
+        """Helper method to check if the staff member has 'admin' role."""
+        if staff_member.role != "admin":
+            return False, "Permission denied. Only admins can view or manage this data."
+        return True, None
 
 
     def authentication(self, request):
@@ -160,25 +166,62 @@ class CompanyStaffAuthenticationView(APIView):
 
 
 class ListAllStaffByCompany(BaseAPIView):
-    def get(self, request):
+
+    def authenticate_and_get_staff(self, request):
+        """Helper method to authenticate and fetch staff member."""
         try:
             auth_user = self.authentication(request)
             user_id = auth_user.get('id')
-
             if not user_id:
-                return Response({"status": "error"},status=status.HTTP_400_BAD_REQUEST)
+                return None, "User ID is missing. Please provide a valid user ID."
 
             staff_member = Staff.objects.select_related('company').get(pk=user_id)
-            if staff_member.role == "admin":
-                serializer = CompanyStaffSerializers(staff_member.company)
-                return Response({"status": "success","data": serializer.data},status=status.HTTP_200_OK)
-            else:
-                return Response(
-                    {"message": "Permission denied. Only admins can view this data."},status=status.HTTP_403_FORBIDDEN)
+            return staff_member, None
         except Staff.DoesNotExist:
-            return Response({"status": "error"},status=status.HTTP_404_NOT_FOUND)
+            return None, "Staff member not found in the database."
         except Exception as e:
-            return Response({"status": "error", "message": f"{str(e)}"},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return None, f"An error occurred while fetching staff details: {str(e)}"
+
+    def post(self, request):
+        """Handles post request for creating staff under a company."""
+        staff_member, error = self.authenticate_and_get_staff(request)
+        if not staff_member:
+            return Response({"status": "error", "message": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check for admin role permission
+        is_admin, permission_error = self.permission_check(staff_member)
+        if not is_admin:
+            return Response({"status": "error", "message": permission_error}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            serializer = StaffSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(company=staff_member.company)
+                return Response({"status": "success", "data": serializer.data}, status=status.HTTP_201_CREATED)
+            else:
+                return Response({"status": "error", "message": "Invalid input.", "errors": serializer.errors},
+                                status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"status": "error", "message": f"An error occurred while creating staff: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def get(self, request):
+        """Handles get request for fetching staff data under a company."""
+        staff_member, error = self.authenticate_and_get_staff(request)
+        if not staff_member:
+            return Response({"status": "error", "message": error}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check for admin role permission
+        is_admin, permission_error = self.permission_check(staff_member)
+        if not is_admin:
+            return Response({"status": "error", "message": permission_error}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            serializer = CompanyStaffSerializers(staff_member.company)
+            return Response({"status": "success", "data": serializer.data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status": "error", "message": f"An error occurred while retrieving company staff: {str(e)}"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -311,3 +354,6 @@ class ResetPasswordView(BaseAPIView):
             return self.error_response("Email not found.", status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return self.error_response(f"An error occurred: {str(e)}", status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
