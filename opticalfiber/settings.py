@@ -176,4 +176,13 @@ DEFAULT_FROM_EMAIL = 'Muhammad Fuhad <muhammadfuhad3@gmail.com>'
 
 
 
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",  # DB 1 for general caching
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        }
+    }
+}
 
