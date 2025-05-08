@@ -39,7 +39,7 @@ class FiberRouteListView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 logger.warning("Company ID missing in authentication data")
                 return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
@@ -62,7 +62,7 @@ class FiberRouteManagementView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 logger.warning("Company ID missing in authentication data")
                 return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
@@ -80,7 +80,7 @@ class FiberRouteManagementView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company_id')
+            company_id = auth_user.get('company')
             if not company_id:
                 logger.warning("Company ID missing in authentication data")
                 return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
