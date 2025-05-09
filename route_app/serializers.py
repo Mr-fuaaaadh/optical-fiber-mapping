@@ -1,16 +1,10 @@
 from rest_framework import serializers
 from .models import FiberRoute
+from django.core.exceptions import ValidationError
 
 class FiberRouteSerializer(serializers.ModelSerializer):
-    class Meta :
+    class Meta:
         model = FiberRoute
-        fields = "__all__"
-        read_only_fields = ['created_at']
-
-
-
-
-
-
+        fields = '__all__'
 
 

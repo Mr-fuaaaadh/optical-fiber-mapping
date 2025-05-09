@@ -194,9 +194,10 @@ class ListAllStaffByCompany(BaseAPIView):
             return Response({"status": "error", "message": permission_error}, status=status.HTTP_403_FORBIDDEN)
 
         try:
+            request.data['company'] = staff_member.company.pk
             serializer = StaffSerializer(data=request.data)
             if serializer.is_valid():
-                serializer.save(company=staff_member.company)
+                serializer.save()
                 return Response({"status": "success", "data": serializer.data}, status=status.HTTP_201_CREATED)
             else:
                 return Response({"status": "error", "message": "Invalid input.", "errors": serializer.errors},
@@ -244,7 +245,7 @@ class EditStaffProfile(BaseAPIView):
     def get(self, request):
         try:
             staff_instance = self.get_authenticated_staff(request)
-            serializer = StaffSerializer(staff_instance)
+            serializer = StaffProfileSerializer(staff_instance)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Http404:
             return Response({"detail": "Staff not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -254,7 +255,7 @@ class EditStaffProfile(BaseAPIView):
     def put(self, request):
         try:
             staff_instance = self.get_authenticated_staff(request)
-            serializer = StaffSerializer(staff_instance, data=request.data, partial=True)
+            serializer = StaffProfileSerializer(staff_instance, data=request.data, partial=True)
 
             if serializer.is_valid():
                 serializer.save()

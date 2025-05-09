@@ -10,7 +10,6 @@ from .tasks import *
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
-from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +23,8 @@ class FiberRouteView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            # Validate before dispatching to Celery
-            serializer = FiberRouteSerializer(data=request.data)
+            # Include the authenticated user in the serializer context for validation
+            serializer = FiberRouteSerializer(data=request.data, context={'request': request})
             serializer.is_valid(raise_exception=True)
 
             # Dispatch to Celery
@@ -37,6 +36,7 @@ class FiberRouteView(BaseAPIView):
         except (ValueError, DatabaseError, Exception) as e:
             return self.handle_exception(e)
 
+
     
 
 
@@ -44,8 +44,12 @@ class FiberRouteListView(BaseAPIView):
     """
     Retrieves a list of Fiber Routes for the authenticated user's company, using Redis cache.
     """
+
+    CACHE_TIMEOUT = 300  # 5 minutes
+
     def get(self, request):
         try:
+            # Authenticate user
             auth_user = self.authentication(request)
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
@@ -54,30 +58,31 @@ class FiberRouteListView(BaseAPIView):
             if not company_id:
                 return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
 
-            # Try to get from cache
             cache_key = f"fiber_routes_company_{company_id}"
             cached_data = cache.get(cache_key)
 
             if cached_data:
                 return Response(cached_data, status=status.HTTP_200_OK)
 
-            # Not in cache → fetch from DB
+            # Fetch from DB if not cached
             fiber_routes = FiberRoute.objects.filter(office__company__id=company_id)
             if not fiber_routes.exists():
                 return self.error_response("No fiber routes found for this company", status.HTTP_404_NOT_FOUND)
 
             serializer = FiberRouteSerializer(fiber_routes, many=True)
-            data = serializer.data
+            serialized_data = serializer.data
 
-            # Set cache for 5 minutes
-            cache.set(cache_key, data, timeout=300)
+            # Store in cache
+            cache.set(cache_key, serialized_data, timeout=self.CACHE_TIMEOUT)
 
-            return Response(data, status=status.HTTP_200_OK)
+            return Response(serialized_data, status=status.HTTP_200_OK)
 
-        except (ObjectDoesNotExist, DatabaseError, Exception) as e:
-            logger.error(f"Error in FiberRouteListView: {str(e)}")
-            return self.handle_exception(e)
-
+        except (ObjectDoesNotExist, DatabaseError) as e:
+            logger.exception("Database-related error in FiberRouteListView")
+            return self.error_response("A database error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.exception("Unexpected error in FiberRouteListView")
+            return self.error_response("An unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
 
