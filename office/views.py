@@ -7,6 +7,9 @@ from opticalfiber_app.views import BaseAPIView
 from .serializers import *
 from opticalfiber_app.models import Company
 from .models import Office
+import logging
+
+logger = logging.getLogger(__name__)
 # Create your views here.
 
 from rest_framework.exceptions import ValidationError
@@ -27,13 +30,18 @@ class OfficeView(BaseAPIView):
 
             serializer = OfficeSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            serializer.save(company=company)  # Injecting the company
+            serializer.save(company=company)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Company.DoesNotExist:
             return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        except ValidationError as ve:
+            return Response({"error": "Validation failed", "details": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
+            logger.exception("Unexpected error during Office creation")
             return Response(
                 {"error": "An unexpected error occurred", "details": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -82,10 +90,7 @@ class OfficeManagementView(BaseAPIView):
         except Company.DoesNotExist:
             return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(
-                {"error": "An unexpected error occurred", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "An unexpected error occurred", "details": str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
     def put(self, request, office_id):
@@ -135,10 +140,7 @@ class OfficeManagementView(BaseAPIView):
         except Company.DoesNotExist:
             return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(
-                {"error": "An unexpected error occurred", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return Response({"error": "An unexpected error occurred", "details": str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         
 
 

@@ -13,7 +13,7 @@ Class-based views
 Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
-"""
+""" 
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -25,6 +25,7 @@ urlpatterns = [
     path('office/',include('office.urls')),
     path('route/',include('route_app.urls')),
     path('junction/',include('junction_app.urls')),
+    path('networkdevice/',include('networkdevice_app.urls')),
 
 ]
 if settings.DEBUG:
