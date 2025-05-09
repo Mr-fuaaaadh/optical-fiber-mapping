@@ -1,10 +1,8 @@
-from serializers import ModelSerializer
-from rest_framework import serializers
 from .models import *
+from rest_framework import serializers
 
 
-
-class NetworkDeviceSerializer(ModelSerializer):
+class NetworkDeviceSerializer(serializers.ModelSerializer):
     """
     Serializer for NetworkDevice model.
     """
@@ -14,7 +12,7 @@ class NetworkDeviceSerializer(ModelSerializer):
         read_only_fields = ['c', 'updated_at']
 
 
-class DevicePortSerializer(ModelSerializer):
+class DevicePortSerializer(serializers.ModelSerializer):
     """
     Serializer for DevicePort model.
     """
