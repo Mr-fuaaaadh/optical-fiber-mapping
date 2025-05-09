@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'office',
     'route_app',
     'junction_app',
+    'networkdevice_app',
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',

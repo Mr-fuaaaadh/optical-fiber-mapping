@@ -6,6 +6,7 @@ from decimal import Decimal
 
 class FiberRoute(models.Model):
     office = models.ForeignKey(Office, on_delete=models.CASCADE, related_name='fiber_routes', db_index=True)
+    created_by = models.ForeignKey(Staff, on_delete=models.CASCADE, null=True, blank=True, related_name='fiber_routes_created')
     name = models.CharField(max_length=255, db_index=True)
     slug = models.SlugField(unique=True, blank=True)
     path = models.JSONField() 
@@ -22,14 +23,6 @@ class FiberRoute(models.Model):
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-    def get_path_length(self):
-        """
-        Example method that calculates the length of the route based on path coordinates
-        (Placeholder for actual path calculation logic).
-        """
-        path = self.path
-        if isinstance(path, list) and len(path) > 1:
-            return sum([calculate_distance(p1, p2) for p1, p2 in zip(path[:-1], path[1:])])
         return Decimal(0)
 
     class Meta:

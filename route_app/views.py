@@ -8,8 +8,8 @@ from .serializers import FiberRouteSerializer
 from .models import FiberRoute
 from .tasks import * 
 from django.db.models import Prefetch
+from django.shortcuts import get_object_or_404
 from django.core.cache import cache
-from asgiref.sync import sync_to_async  # For async views
 from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
@@ -80,44 +80,64 @@ class FiberRouteListView(BaseAPIView):
 
         
 
+
 class FiberRouteManagementView(BaseAPIView):
-    def delete(self, request, route_id):
+
+    def _get_authenticated_company(self, request):
+        """Authenticate user and return company ID or error response"""
+        user = self.authentication(request)
+        if not user:
+            return None, self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
+
+        company_id = user.get("company")
+        if not company_id:
+            logger.warning("Company ID missing in authentication data for user: %s", user.get("id"))
+            return None, self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
+
+        return company_id, None
+
+    def delete(self, request, fiber_route_id):
+        company_id, error_response = self._get_authenticated_company(request)
+        if error_response:
+            return error_response
+
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
-
-            company_id = auth_user.get('company')
-            if not company_id:
-                logger.warning("Company ID missing in authentication data")
-                return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
-
-            fiber_route = FiberRoute.objects.get(id=route_id, office__company__id=company_id)
+            fiber_route = get_object_or_404(FiberRoute, id=fiber_route_id, office__company_id=company_id)
             fiber_route.delete()
+
+            logger.info("Fiber route ID %s deleted by company %s", fiber_route_id, company_id)
             return Response({"message": "Fiber route deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
-        except (ObjectDoesNotExist, DatabaseError, Exception) as e:
-            return self.handle_exception(e)
-        
-    def put(self, request, route_id):
+        except DatabaseError as db_err:
+            logger.error("Database error while deleting fiber route %s: %s", fiber_route_id, db_err)
+            return self.error_response("A database error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.exception("Unexpected error deleting fiber route %s: %s", fiber_route_id, e)
+            return self.error_response("An unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def put(self, request, fiber_route_id):
+        company_id, error_response = self._get_authenticated_company(request)
+        if error_response:
+            return error_response
+
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
+            fiber_route = get_object_or_404(FiberRoute, id=fiber_route_id, office__company_id=company_id)
 
-            company_id = auth_user.get('company')
-            if not company_id:
-                logger.warning("Company ID missing in authentication data")
-                return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
-
-            fiber_route = FiberRoute.objects.get(id=route_id, office__company__id=company_id)
             serializer = FiberRouteSerializer(fiber_route, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
+
+            logger.info("Fiber route ID %s updated by company %s", fiber_route_id, company_id)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except (ObjectDoesNotExist, DatabaseError, Exception) as e:
-            return self.handle_exception(e)
+        except DatabaseError as db_err:
+            logger.error("Database error while updating fiber route %s: %s", fiber_route_id, db_err)
+            return self.error_response("A database error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        except Exception as e:
+            logger.exception("Unexpected error updating fiber route %s: %s", fiber_route_id, e)
+            return self.error_response("An unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
