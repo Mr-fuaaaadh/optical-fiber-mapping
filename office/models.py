@@ -13,6 +13,10 @@ class Office(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     note = models.TextField(blank=True, null=True)
 
+
+    def __str__(self):
+        return f"{self.name} - {self.company.name}"
+
     class Meta:
         verbose_name = 'Office'
         verbose_name_plural = 'Offices'

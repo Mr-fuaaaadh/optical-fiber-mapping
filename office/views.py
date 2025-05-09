@@ -6,197 +6,190 @@ from django.shortcuts import get_object_or_404
 from opticalfiber_app.views import BaseAPIView
 from .serializers import *
 from opticalfiber_app.models import Company
+from opticalfiber_app.models import Staff
 from .models import Office
+from django.http import Http404
 import logging
-
+from rest_framework.exceptions import ValidationError
+from django.db import IntegrityError
 logger = logging.getLogger(__name__)
 # Create your views here.
 
-from rest_framework.exceptions import ValidationError
-from django.db import IntegrityError
+
+
 
 class OfficeView(BaseAPIView):
+
+    def _get_authenticated_user_and_company(self, request):
+        auth_user = self.authentication(request)
+        if not auth_user:
+            return None, None, Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        company_id = auth_user.get("company")
+        if not company_id:
+            return auth_user, None, Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return auth_user, company_id, None
+
     def post(self, request):
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
+            auth_user, company_id, error = self._get_authenticated_user_and_company(request)
+            if error:
+                return error
 
-            company_id = auth_user.get('company')
-            if not company_id:
-                return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
-
-            company = Company.objects.get(id=company_id)
+            company = get_object_or_404(Company, id=company_id)
+            created_by = get_object_or_404(Staff, id=auth_user.get("id"))
 
             serializer = OfficeSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            serializer.save(company=company)
+            serializer.save(company=company, created_by=created_by)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        except Company.DoesNotExist:
-            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
-
         except ValidationError as ve:
             return Response({"error": "Validation failed", "details": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
-
         except Exception as e:
             logger.exception("Unexpected error during Office creation")
-            return Response(
-                {"error": "An unexpected error occurred", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        
+            return Response({"error": "An unexpected error occurred", "details": str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request):
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
-
-            company_id = auth_user.get('company')
-            if not company_id:
-                return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
+            auth_user, company_id, error = self._get_authenticated_user_and_company(request)
+            if error:
+                return error
 
             offices = Office.objects.filter(company__id=company_id)
             serializer = OfficeSerializer(offices, many=True)
-
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except Company.DoesNotExist:
-            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"error": "An unexpected error occurred", "details": str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "An unexpected error occurred", "details": str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     
         
 class OfficeManagementView(BaseAPIView):
-    def delete(self, request, office_id):
+
+    def _get_authenticated_user_and_company(self, request):
+        auth_user = self.authentication(request)
+        if not auth_user:
+            return None, None, Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        company_id = auth_user.get('company')
+        if not company_id:
+            return auth_user, None, Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
+
+        return auth_user, company_id, None
+
+    def _get_office(self, office_id, company_id):
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
-
-            company_id = auth_user.get('company')
-            if not company_id:
-                return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
-
-            office = Office.objects.get(id=office_id, company__id=company_id)
-            office.delete()
-
-            return Response({"message": "Office deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-
+            return Office.objects.get(id=office_id, company__id=company_id)
         except Office.DoesNotExist:
-            return Response({"error": "Office not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Company.DoesNotExist:
-            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+            raise Http404("Office not found")
+
+    def get(self, request, office_id):
+        try:
+            auth_user, company_id, error = self._get_authenticated_user_and_company(request)
+            if error:
+                return error
+
+            office = self._get_office(office_id, company_id)
+            serializer = OfficeSerializer(office)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        except Http404 as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"error": "An unexpected error occurred", "details": str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+            return Response({"error": "An unexpected error occurred", "details": str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request, office_id):
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
+            auth_user, company_id, error = self._get_authenticated_user_and_company(request)
+            if error:
+                return error
 
-            company_id = auth_user.get('company')
-            if not company_id:
-                return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
-
-            office = Office.objects.get(id=office_id, company__id=company_id)
+            office = self._get_office(office_id, company_id)
             serializer = OfficeSerializer(office, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except Office.DoesNotExist:
-            return Response({"error": "Office not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Company.DoesNotExist:
-            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Http404 as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(
-                {"error": "An unexpected error occurred", "details": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-        
-    def get(self, request, office_id):
+            return Response({"error": "An unexpected error occurred", "details": str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def delete(self, request, office_id):
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return Response({"error": "Authentication failed"}, status=status.HTTP_401_UNAUTHORIZED)
+            auth_user, company_id, error = self._get_authenticated_user_and_company(request)
+            if error:
+                return error
 
-            company_id = auth_user.get('company')
-            if not company_id:
-                return Response({"error": "Company ID not found in authenticated user"}, status=status.HTTP_400_BAD_REQUEST)
+            office = self._get_office(office_id, company_id)
+            office.delete()
+            return Response({"message": "Office deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
 
-            office = Office.objects.get(id=office_id, company__id=company_id)
-            serializer = OfficeSerializer(office)
-
-            return Response(serializer.data, status=status.HTTP_200_OK)
-
-        except Office.DoesNotExist:
-            return Response({"error": "Office not found"}, status=status.HTTP_404_NOT_FOUND)
-        except Company.DoesNotExist:
-            return Response({"error": "Company not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Http404 as e:
+            return Response({"error": str(e)}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response({"error": "An unexpected error occurred", "details": str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"error": "An unexpected error occurred", "details": str(e)},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
         
 
 
 # Branch View
 
 class BranchView(BaseAPIView):
+
+    def _get_authenticated_user(self, request):
+        """Encapsulated logic to authenticate the user."""
+        auth_user = self.authentication(request)
+        if not auth_user:
+            return None, self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
+        return auth_user, None
+
+    def _get_company_id(self, auth_user):
+        """Encapsulated logic to get the company ID from the user."""
+        company_id = auth_user.get('company')
+        if not company_id:
+            return None, self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
+        return company_id, None
+
     def post(self, request):
         try:
-            # Authenticate user
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
+            auth_user, error = self._get_authenticated_user(request)
+            if error:
+                return error
 
-            # Validate office_id presence
-            office_id = request.data.get('office_id')
-            if not office_id:
-                return self.error_response("Office ID is required", status.HTTP_400_BAD_REQUEST)
-
-            # Fetch the office object
-            try:
-                office = get_object_or_404(Office, id=office_id)
-            except Office.DoesNotExist:
-                return self.error_response("Office not found", status.HTTP_404_NOT_FOUND)
-
-            # Validate and save the branch data
+            created_by = get_object_or_404(Staff, pk=auth_user.get('id'))
             serializer = BranchSerializer(data=request.data)
-            try:
-                serializer.is_valid(raise_exception=True)
-                serializer.save(office=office)
-            except ValidationError as ve:
-                return self.error_response("Validation error", status.HTTP_400_BAD_REQUEST, details=ve.detail)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(created_by=created_by)
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except ValidationError as ve:
-            return self.error_response("Validation error", status.HTTP_400_BAD_REQUEST, details=ve.detail)
+            return self.error_response("Validation error", status.HTTP_400_BAD_REQUEST, details=self._format_error(ve))
         except IntegrityError as ie:
             return self.error_response("Database integrity error", status.HTTP_400_BAD_REQUEST, details=str(ie))
         except Exception as e:
             return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
-        
-
 
     def get(self, request):
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
+            auth_user, error = self._get_authenticated_user(request)
+            if error:
+                return error
 
-            company_id = auth_user.get('company')
-            if not company_id:
-                return self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
+            company_id, error = self._get_company_id(auth_user)
+            if error:
+                return error
 
-            # Optimized query: prefetch related office to reduce DB hits
             branches = Branch.objects.select_related('office').filter(office__company__id=company_id)
-
             if not branches.exists():
                 return self.error_response("No branches found for this company", status.HTTP_404_NOT_FOUND)
 
@@ -206,49 +199,59 @@ class BranchView(BaseAPIView):
         except Exception as e:
             return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
 
+    def _format_error(self, error):
+        """Utility method to handle ValidationError formatting."""
+        return error.detail if hasattr(error, 'detail') else str(error)
+
         
 
 class BranchManagementView(BaseAPIView):
-    def delete(self, request, branch_id):
+    def get_authenticated_user_and_branch(self, request, branch_id):
+        auth_user = self.authentication(request)
+        if not auth_user:
+            return None, self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
+
+        company_id = auth_user.get('company')
+        if not company_id:
+            return None, self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
+
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
-
-            company_id = auth_user.get('company')
-            if not company_id:
-                return self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
-
-            # Fetch the branch object
             branch = get_object_or_404(Branch, id=branch_id, office__company__id=company_id)
-            branch.delete()
-
-            return Response({"message": "Branch deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
-
+            return branch, None
         except Branch.DoesNotExist:
-            return self.error_response("Branch not found", status.HTTP_404_NOT_FOUND)
+            return None, self.error_response("Branch not found", status.HTTP_404_NOT_FOUND)
+
+    def delete(self, request, branch_id):
+        branch, error_response = self.get_authenticated_user_and_branch(request, branch_id)
+        if error_response:
+            return error_response
+
+        try:
+            branch.delete()
+            return Response({"message": "Branch deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
             return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
-        
+
     def put(self, request, branch_id):
+        branch, error_response = self.get_authenticated_user_and_branch(request, branch_id)
+        if error_response:
+            return error_response
+
         try:
-            auth_user = self.authentication(request)
-            if not auth_user:
-                return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
-
-            company_id = auth_user.get('company')
-            if not company_id:
-                return self.error_response("Company ID not found in authenticated user", status.HTTP_400_BAD_REQUEST)
-
-            # Fetch the branch object
-            branch = get_object_or_404(Branch, id=branch_id, office__company__id=company_id)
             serializer = BranchSerializer(branch, data=request.data, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
-
             return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return self.error_response("Unexpected error", status=status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
 
-        except Branch.DoesNotExist:
-            return self.error_response("Branch not found", status=status.HTTP_404_NOT_FOUND)
+    def get(self, request, branch_id):
+        branch, error_response = self.get_authenticated_user_and_branch(request, branch_id)
+        if error_response:
+            return error_response
+
+        try:
+            serializer = BranchSerializer(branch)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
             return self.error_response("Unexpected error", status=status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))

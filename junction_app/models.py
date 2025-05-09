@@ -11,7 +11,6 @@ class JunctionBox(models.Model):
     name = models.CharField(max_length=255, verbose_name="Junction Box Name")
     location = models.CharField(max_length=255, verbose_name="Location")
     description = models.TextField(null=True, blank=True, verbose_name="Description")
-    parent_box = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name="child_junction_boxes", verbose_name="Parent Junction Box")
     staff = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Staff Member")
     junction_type = models.CharField(max_length=50, choices=[('Main', 'Main'), ('Child', 'Child')], default='Child', verbose_name="Junction Box Type")
 

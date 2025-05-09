@@ -21,3 +21,9 @@ class CompanyStaffSerializers(serializers.ModelSerializer):
 class StaffLoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField()
+
+
+class StaffProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Staff
+        fields = ['id','name', 'email',]

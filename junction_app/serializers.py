@@ -9,6 +9,7 @@ class JunctionBoxSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
 
+
 class JunctionDeviceSerializer(serializers.ModelSerializer):
     class Meta:
         model = JunctionBoxDevice
