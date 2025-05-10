@@ -10,8 +10,9 @@ class JunctionBox(models.Model):
     office = models.ForeignKey(Office, on_delete=models.CASCADE, verbose_name="Office")
     name = models.CharField(max_length=255, verbose_name="Junction Box Name")
     location = models.CharField(max_length=255, verbose_name="Location")
+    post_code = models.CharField(max_length=10, verbose_name="Post Code")
     description = models.TextField(null=True, blank=True, verbose_name="Description")
-    staff = models.ForeignKey(Staff, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Staff Member")
+    staff = models.ForeignKey(Staff, on_delete=models.CASCADE,  verbose_name="Staff Member")
     junction_type = models.CharField(max_length=50, choices=[('Main', 'Main'), ('Child', 'Child')], default='Child', verbose_name="Junction Box Type")
 
     def __str__(self):

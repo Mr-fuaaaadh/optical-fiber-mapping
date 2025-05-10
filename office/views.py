@@ -167,17 +167,17 @@ class BranchView(BaseAPIView):
 
             created_by = get_object_or_404(Staff, pk=auth_user.get('id'))
             serializer = BranchSerializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save(created_by=created_by)
-
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
+            if serializer.is_valid(raise_exception=True) :
+                serializer.save(created_by=created_by)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         except ValidationError as ve:
-            return self.error_response("Validation error", status.HTTP_400_BAD_REQUEST, details=self._format_error(ve))
+            return Response({"error": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
         except IntegrityError as ie:
-            return self.error_response("Database integrity error", status.HTTP_400_BAD_REQUEST, details=str(ie))
+            return self.error_response("Database integrity error", status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
+            return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request):
         try:

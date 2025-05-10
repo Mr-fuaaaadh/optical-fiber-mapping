@@ -51,4 +51,3 @@ class DevicePort(models.Model):
     def __str__(self):
         return f"Port {self.port_number} - {self.device} ({self.port_type})"
 
-
