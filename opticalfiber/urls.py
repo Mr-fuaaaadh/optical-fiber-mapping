@@ -26,6 +26,7 @@ urlpatterns = [
     path('route/',include('route_app.urls')),
     path('junction/',include('junction_app.urls')),
     path('networkdevice/',include('networkdevice_app.urls')),
+    path('customer/',include('customer_app.urls')),
 
 ]
 if settings.DEBUG:
