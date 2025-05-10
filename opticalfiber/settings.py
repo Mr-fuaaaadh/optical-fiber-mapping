@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'route_app',
     'junction_app',
     'networkdevice_app',
+    'customer_app',
     'corsheaders',
     'rest_framework',
     'rest_framework_simplejwt',
