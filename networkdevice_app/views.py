@@ -6,6 +6,7 @@ from .models import NetworkDevice, DevicePort
 from .serializers import NetworkDeviceSerializer, DevicePortSerializer
 from opticalfiber_app.views import BaseAPIView
 from opticalfiber_app.models import Staff
+from office.models import Office
 from django.shortcuts import get_object_or_404
 
 class NetworkDeviceListCreateAPIView(BaseAPIView):
@@ -52,6 +53,7 @@ class NetworkDeviceListCreateAPIView(BaseAPIView):
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            request.data['staff'] = auth_user.pk
             serializer = NetworkDeviceSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save()
@@ -132,7 +134,11 @@ class DevicePortListCreateAPIView(NetworkDeviceListCreateAPIView):
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
         
-        office = request.data.get('office')
+        office_id = request.query_params.get('office')
+        if not office_id:
+            return Response({"error": "Office ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        office = get_object_or_404(Office, id=office_id)
         if office:
             ports = DevicePort.objects.filter(device__office_id=office)
             serializer = DevicePortSerializer(ports, many=True)
@@ -194,3 +200,4 @@ class DevicePortRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         port = response
         port.delete()
         return Response(status=status.HTTP_200_OK)
+    

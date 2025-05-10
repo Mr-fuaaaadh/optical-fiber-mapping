@@ -34,7 +34,7 @@ class JunctionAPIView(BaseAPIView):
 
             # Ensure request.data is mutable before updating
             data = request.data.copy()
-            data['created_by'] = auth_user.pk
+            data['staff'] = auth_user.pk
 
             serializer = JunctionBoxSerializer(data=data)
             if serializer.is_valid():
@@ -135,7 +135,7 @@ class JunctionDeviceAPIView(BaseAPIView):
         except Exception as e:
             return None, f"An error occurred while fetching staff details: {str(e)}"
         
-    def post(self, request):
+    def post(self, request,pk):
         auth_user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
