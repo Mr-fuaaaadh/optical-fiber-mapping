@@ -17,7 +17,7 @@ class JunctionAPIView(BaseAPIView):
             auth_user = self.authentication(request)
             user_id = auth_user.get('id')
             if not user_id:
-                return None, "User ID is missing. Please provide a valid user ID."
+                return None, "Unauthorized access"
 
             staff_member = Staff.objects.select_related('company').get(pk=user_id)
             return staff_member, None
@@ -68,7 +68,7 @@ class JunctionDetailAPIView(BaseAPIView):
             auth_user = self.authentication(request)
             user_id = auth_user.get('id')
             if not user_id:
-                return None, "User ID is missing. Please provide a valid user ID."
+                return None, "Unauthorized access"
 
             staff_member = Staff.objects.select_related('company').get(pk=user_id)
             return staff_member, None
@@ -126,7 +126,7 @@ class JunctionDeviceAPIView(BaseAPIView):
             auth_user = self.authentication(request)
             user_id = auth_user.get('id')
             if not user_id:
-                return None, "User ID is missing. Please provide a valid user ID."
+                return None, "Unauthorized access"
 
             staff_member = Staff.objects.select_related('company').get(pk=user_id)
             return staff_member, None
@@ -170,7 +170,7 @@ class JunctionDeviceDetailAPIView(BaseAPIView):
             auth_user = self.authentication(request)
             user_id = auth_user.get('id')
             if not user_id:
-                return None, "User ID is missing. Please provide a valid user ID."
+                return None, "Unauthorized access"
 
             staff_member = Staff.objects.select_related('company').get(pk=user_id)
             return staff_member, None

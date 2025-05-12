@@ -4,7 +4,7 @@ from django.utils import timezone
 from datetime import timedelta
 
 class Company(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255, unique=True, db_index=True)
     registration_number = models.CharField(max_length=100, unique=True)
     logo = models.ImageField(upload_to='company_logos/', blank=True, null=True)
     email = models.EmailField()
