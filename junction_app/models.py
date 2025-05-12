@@ -7,7 +7,7 @@ class JunctionBox(models.Model):
     """
     Represents a junction box (either main or child).
     """
-    office = models.ForeignKey(Office, on_delete=models.CASCADE, verbose_name="Office")
+    office = models.ForeignKey(Office, on_delete=models.CASCADE, verbose_name="Office", related_name="junction_boxes")
     name = models.CharField(max_length=255, verbose_name="Junction Box Name")
     location = models.CharField(max_length=255, verbose_name="Location")
     post_code = models.CharField(max_length=10, verbose_name="Post Code")
@@ -23,7 +23,7 @@ class JunctionBoxDevice(models.Model):
     """
     Represents a device added to a junction box (splitter, coupler, etc.).
     """
-    junction_box = models.ForeignKey(JunctionBox, related_name="devices", on_delete=models.CASCADE, verbose_name="Junction Box")
+    junction_box = models.ForeignKey(JunctionBox, related_name="devices", on_delete=models.CASCADE, verbose_name="Junction Box",)
     device = models.ForeignKey(NetworkDevice, related_name="junction_boxes", on_delete=models.CASCADE, verbose_name="Network Device")
     installation_date = models.DateField(null=True, blank=True, verbose_name="Installation Date")
 
