@@ -197,7 +197,7 @@ class BranchView(BaseAPIView):
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
+            return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def _format_error(self, error):
         """Utility method to handle ValidationError formatting."""
@@ -230,7 +230,7 @@ class BranchManagementView(BaseAPIView):
             branch.delete()
             return Response({"message": "Branch deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
         except Exception as e:
-            return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
+            return self.error_response("Unexpected error", status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request, branch_id):
         branch, error_response = self.get_authenticated_user_and_branch(request, branch_id)
@@ -243,7 +243,7 @@ class BranchManagementView(BaseAPIView):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
-            return self.error_response("Unexpected error", status=status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
+            return self.error_response("Unexpected error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def get(self, request, branch_id):
         branch, error_response = self.get_authenticated_user_and_branch(request, branch_id)
@@ -254,4 +254,4 @@ class BranchManagementView(BaseAPIView):
             serializer = BranchSerializer(branch)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
-            return self.error_response("Unexpected error", status=status.HTTP_500_INTERNAL_SERVER_ERROR, details=str(e))
+            return self.error_response("Unexpected error", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
