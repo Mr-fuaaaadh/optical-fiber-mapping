@@ -9,7 +9,8 @@ class JunctionBox(models.Model):
     """
     office = models.ForeignKey(Office, on_delete=models.CASCADE, verbose_name="Office", related_name="junction_boxes")
     name = models.CharField(max_length=255, verbose_name="Junction Box Name")
-    location = models.CharField(max_length=255, verbose_name="Location")
+    latitude = models.FloatField()
+    longitude = models.FloatField()
     post_code = models.CharField(max_length=10, verbose_name="Post Code")
     description = models.TextField(null=True, blank=True, verbose_name="Description")
     staff = models.ForeignKey(Staff, on_delete=models.CASCADE,  verbose_name="Staff Member")
