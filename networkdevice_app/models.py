@@ -32,6 +32,8 @@ class NetworkDevice(models.Model):
     return_loss = models.FloatField(null=True, blank=True, verbose_name="Return Loss (dB)")
     port_count = models.IntegerField(null=True, blank=True, verbose_name="Number of Ports")
     supported_protocols = models.CharField(max_length=255, null=True, blank=True, verbose_name="Supported Protocols")
+    latitude = models.FloatField()
+    logitutde =  models.FloatField()
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Updated At")
