@@ -202,7 +202,7 @@ class DevicePortRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         if response:
             return response
 
-        port = response
+        port = port
         port.delete()
         return Response(status=status.HTTP_200_OK)
     
