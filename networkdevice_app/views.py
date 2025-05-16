@@ -152,7 +152,7 @@ class DevicePortListCreateAPIView(NetworkDeviceListCreateAPIView):
 
         serializer = DevicePortSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(created_by=user)  # Set user as creator
+            serializer.save()  
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -166,22 +166,27 @@ class DevicePortRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         """Helper function to centralize auth + object retrieval logic"""
         user, error = self.get_authenticated_user(request)
         if error:
-            return None, Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
+            return None, None, Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
 
         # Retrieve the DevicePort object
-        port = get_object_or_404(DevicePort, pk=pk)
-        return user, port
+        try:
+            port = DevicePort.objects.get(pk=pk)
+        except DevicePort.DoesNotExist:
+            return user, None, Response({"error": "DevicePort not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        return user, port, None
+
 
     def get(self, request, pk, *args, **kwargs):
-        user, response = self.handle_auth_and_get_object(request, pk)
-        if response:
-            return response
+        user, port, error_response = self.handle_auth_and_get_object(request, pk)
+        if error_response:
+            return error_response
 
-        serializer = DevicePortSerializer(response)
+        serializer = DevicePortSerializer(port)
         return Response(serializer.data)
 
     def put(self, request, pk, *args, **kwargs):
-        user, response = self.handle_auth_and_get_object(request, pk)
+        user, port, response = self.handle_auth_and_get_object(request, pk)
         if response:
             return response
 
@@ -193,7 +198,7 @@ class DevicePortRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk, *args, **kwargs):
-        user, response = self.handle_auth_and_get_object(request, pk)
+        user, port, response = self.handle_auth_and_get_object(request, pk)
         if response:
             return response
 
