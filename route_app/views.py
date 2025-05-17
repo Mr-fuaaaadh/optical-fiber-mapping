@@ -22,16 +22,19 @@ class FiberRouteView(BaseAPIView):
             auth_user = self.authentication(request)
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
-
-            # Include the authenticated user in the serializer context for validation
-            serializer = FiberRouteSerializer(data=request.data, context={'request': request})
-            serializer.is_valid(raise_exception=True)
-
-            # Dispatch to Celery
-            save_fiber_route_task.delay(request.data, auth_user.get('id'))
-
-            return Response({"message": "Fiber route is being saved in the background."},
-                            status=status.HTTP_202_ACCEPTED)
+            staff =  get_object_or_404(Staff, pk=auth_user.get('id'))
+            request.data['created_by'] = staff.pk
+            
+            serializer = FiberRouteSerializer(data=request.data)
+            if serializer.is_valid():
+                # Optionally, offload to background task using Celery
+                serializer.save()  # Include creator info if needed
+                return Response(
+                    {"message": "Fiber route is being saved in the background."},
+                    status=status.HTTP_202_ACCEPTED
+                )
+            else:
+                return self.error_response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
         except (ValueError, DatabaseError, Exception) as e:
             return self.handle_exception(e)
@@ -54,18 +57,18 @@ class FiberRouteListView(BaseAPIView):
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            company_id = auth_user.get('company')
-            if not company_id:
-                return self.error_response("Company information missing", status.HTTP_400_BAD_REQUEST)
+            office = request.data.get('office')
+            if not office:
+                return self.error_response("office information missing", status.HTTP_400_BAD_REQUEST)
 
-            cache_key = f"fiber_routes_company_{company_id}"
+            cache_key = f"fiber_routes_company_{office}"
             cached_data = cache.get(cache_key)
 
             if cached_data:
                 return Response(cached_data, status=status.HTTP_200_OK)
 
             # Fetch from DB if not cached
-            fiber_routes = FiberRoute.objects.filter(office__company__id=company_id)
+            fiber_routes = FiberRoute.objects.filter(office__id=office)
             if not fiber_routes.exists():
                 return self.error_response("No fiber routes found for this company", status.HTTP_404_NOT_FOUND)
 
