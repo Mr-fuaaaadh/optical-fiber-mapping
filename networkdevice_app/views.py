@@ -43,7 +43,8 @@ class NetworkDeviceListCreateAPIView(BaseAPIView):
 
         try:
             devices = NetworkDevice.objects.select_related('staff', 'office')\
-                                        .filter(office__company=auth_user.company)
+                                        .filter(office__company=auth_user.company)\
+                                        .order_by('id')
 
             paginator = CustomPagination()
             paginated_devices = paginator.paginate_queryset(devices, request)
