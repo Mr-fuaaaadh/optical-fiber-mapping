@@ -129,14 +129,11 @@ class DevicePortListCreateAPIView(NetworkDeviceListCreateAPIView):
 
         return user, None
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request,office_id, *args, **kwargs):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
         
-        office_id = request.query_params.get('office')
-        if not office_id:
-            return Response({"error": "Office ID is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         office = get_object_or_404(Office, id=office_id)
         if office:
