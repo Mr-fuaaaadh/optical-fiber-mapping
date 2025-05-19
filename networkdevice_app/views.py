@@ -10,6 +10,10 @@ from office.models import Office
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError
+from rest_framework.pagination import PageNumberPagination
+
+class CustomPagination(PageNumberPagination):
+    page_size = 50
 
 class NetworkDeviceListCreateAPIView(BaseAPIView):
     """
@@ -38,14 +42,17 @@ class NetworkDeviceListCreateAPIView(BaseAPIView):
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Optional: filter devices by company
             devices = NetworkDevice.objects.select_related('staff', 'office')\
-                                           .filter(office__company=auth_user.company)
+                                        .filter(office__company=auth_user.company)
 
-            serializer = NetworkDeviceSerializer(devices, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            paginator = CustomPagination()
+            paginated_devices = paginator.paginate_queryset(devices, request)
+            serializer = NetworkDeviceSerializer(paginated_devices, many=True)
+            return paginator.get_paginated_response(serializer.data)
 
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             return Response({"error": f"Failed to fetch devices: {str(e)}"},
                             status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
