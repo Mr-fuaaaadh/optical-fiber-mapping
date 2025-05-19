@@ -8,6 +8,8 @@ from opticalfiber_app.views import BaseAPIView
 from opticalfiber_app.models import Staff
 from office.models import Office
 from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 
 class NetworkDeviceListCreateAPIView(BaseAPIView):
     """
@@ -129,29 +131,40 @@ class DevicePortListCreateAPIView(NetworkDeviceListCreateAPIView):
 
         return user, None
 
-    def get(self, request,office_id, *args, **kwargs):
+    def get(self, request, office_id, *args, **kwargs):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
-        
 
-        office = get_object_or_404(Office, id=office_id)
-        if office:
-            ports = DevicePort.objects.filter(device__office_id=office)
+        try:
+            office = get_object_or_404(Office, id=office_id)
+            ports = DevicePort.objects.filter(device__office=office)
             serializer = DevicePortSerializer(ports, many=True)
-            return Response(serializer.data)
-        return Response({"error": "Office ID is required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Office.DoesNotExist:
+            return Response({"error": "Office not found."}, status=status.HTTP_404_NOT_FOUND)
+        except DatabaseError:
+            return Response({"error": "A database error occurred."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def post(self, request, *args, **kwargs):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
 
-        serializer = DevicePortSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()  
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            serializer = DevicePortSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response({"errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as ve:
+            return Response({"error": str(ve)}, status=status.HTTP_400_BAD_REQUEST)
+        except DatabaseError:
+            return Response({"error": "A database error occurred while saving."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DevicePortRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
