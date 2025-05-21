@@ -10,7 +10,7 @@ urlpatterns = [
 
 
     path('deviceport/<int:office_id>/', DevicePortListCreateAPIView.as_view(), name='deviceport-list-create'),
-    path('deviceport/<int:pk>/', DevicePortRetrieveUpdateDestroyAPIView.as_view(), name='deviceport-detail'),
+    path('deviceport/<int:pk>/get/', DevicePortRetrieveUpdateDestroyAPIView.as_view(), name='deviceport-detail'),
     path('deviceport/<int:pk>/update/', DevicePortRetrieveUpdateDestroyAPIView.as_view(), name='deviceport-update'),
     path('deviceport/<int:pk>/delete/', DevicePortRetrieveUpdateDestroyAPIView.as_view(), name='deviceport-delete'),
 
