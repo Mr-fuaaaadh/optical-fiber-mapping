@@ -139,14 +139,14 @@ class DevicePortListCreateAPIView(NetworkDeviceListCreateAPIView):
 
         return user, None
 
-    def get(self, request, office_id, *args, **kwargs):
+    def get(self, request, device_id, *args, **kwargs):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            office = get_object_or_404(Office, id=office_id)
-            ports = DevicePort.objects.filter(device__office=office)
+            device = get_object_or_404(NetworkDevice, pk=device_id)
+            ports = DevicePort.objects.filter(device=device.pk)
             serializer = DevicePortSerializer(ports, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Office.DoesNotExist:
