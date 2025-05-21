@@ -3,7 +3,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .models import NetworkDevice, DevicePort
-from .serializers import NetworkDeviceSerializer, DevicePortSerializer
+from .serializers import NetworkDeviceSerializer, DevicePortSerializer, DevicePortViewSerializers
 from opticalfiber_app.views import BaseAPIView
 from opticalfiber_app.models import Staff
 from office.models import Office
@@ -103,7 +103,7 @@ class NetworkDeviceRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         if error_response:
             return error_response
         
-        serializer = NetworkDeviceSerializer(device)
+        serializer = DevicePortViewSerializers(device)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def put(self, request, pk, *args, **kwargs):
