@@ -61,3 +61,11 @@ class DevicePortSerializer(serializers.ModelSerializer):
         model = DevicePort
         fields = "__all__"
         read_only_fields = ['created_at', 'updated_at']
+
+
+
+class DevicePortViewSerializers(serializers.ModelSerializer):
+    ports = DevicePortSerializer(read_only = True, many =True)
+    class Meta :
+        model = NetworkDevice
+        fields = "__all__"
