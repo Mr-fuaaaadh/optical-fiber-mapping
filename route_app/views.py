@@ -10,6 +10,7 @@ from .tasks import *
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
+from office.models import Office
 
 logger = logging.getLogger(__name__)
 
@@ -47,25 +48,16 @@ class FiberRouteListView(BaseAPIView):
     """
     Retrieves a list of Fiber Routes for the authenticated user's company, using Redis cache.
     """
-
-    CACHE_TIMEOUT = 300  # 5 minutes
-
-    def get(self, request):
+    def get(self, request, pk):
         try:
             # Authenticate user
             auth_user = self.authentication(request)
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
-            office = request.data.get('office')
+            office = get_object_or_404(Office, pk=pk)
             if not office:
                 return self.error_response("office information missing", status.HTTP_400_BAD_REQUEST)
-
-            cache_key = f"fiber_routes_company_{office}"
-            cached_data = cache.get(cache_key)
-
-            if cached_data:
-                return Response(cached_data, status=status.HTTP_200_OK)
 
             # Fetch from DB if not cached
             fiber_routes = FiberRoute.objects.filter(office__id=office)
@@ -74,9 +66,6 @@ class FiberRouteListView(BaseAPIView):
 
             serializer = FiberRouteSerializer(fiber_routes, many=True)
             serialized_data = serializer.data
-
-            # Store in cache
-            cache.set(cache_key, serialized_data, timeout=self.CACHE_TIMEOUT)
 
             return Response(serialized_data, status=status.HTTP_200_OK)
 
