@@ -60,7 +60,7 @@ class FiberRouteListView(BaseAPIView):
                 return self.error_response("office information missing", status.HTTP_400_BAD_REQUEST)
 
             # Fetch from DB if not cached
-            fiber_routes = FiberRoute.objects.filter(office__id=office)
+            fiber_routes = FiberRoute.objects.filter(office=office)
             if not fiber_routes.exists():
                 return self.error_response("No fiber routes found for this company", status.HTTP_404_NOT_FOUND)
 
