@@ -135,12 +135,3 @@ class FiberRouteManagementView(BaseAPIView):
         except Exception as e:
             logger.exception("Unexpected error updating fiber route %s: %s", fiber_route_id, e)
             return self.error_response("An unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-
-
-        
-
-
-
-    
