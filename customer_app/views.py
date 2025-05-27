@@ -29,22 +29,6 @@ class CustomerAPIView(BaseAPIView):
         except Exception as e:
             return None, f"Authentication error: {str(e)}"
 
-    def get(self, request):
-        user, error = self.get_authenticated_user(request)
-        if error:
-            return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
-
-        try:
-            office_id = request.data.get('office_id')
-            if not office_id:
-                return Response({"error": "Office ID is required."}, status=status.HTTP_400_BAD_REQUEST)
-            office = get_object_or_404(Office, pk=office_id)
-            customers = Customer.objects.filter(office=office)
-            serializer = CustomerSerializer(customers, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"error": f"Failed to retrieve customers: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     def post(self, request):
         user, error = self.get_authenticated_user(request)
         if error:
@@ -66,9 +50,24 @@ class CustomerAPIView(BaseAPIView):
             return Response({"error": "Database integrity error", "details": str(ie)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return Response({"error": f"Unexpected error: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class CustomerListView(CustomerAPIView):
+    def get(self, request,office_id):
+        user, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
+
+        try:
+            office = get_object_or_404(Office, pk=office_id)
+            customers = Customer.objects.filter(office=office)
+            serializer = CustomerSerializer(customers, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Failed to retrieve customers: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class CustomerManagementAPIView(BaseAPIView):
+class CustomerManagementAPIView(CustomerAPIView):
     """
     API view to retrieve, update, or delete a specific customer by ID with staff validation.
     """
@@ -80,40 +79,40 @@ class CustomerManagementAPIView(BaseAPIView):
             if not user_id:
                 return None, "Unauthorized access"
 
-            staff_member = Staff.objects.select_related('company', 'office').get(pk=user_id)
+            staff_member = Staff.objects.select_related('company').get(pk=user_id)
             return staff_member, None
         except Staff.DoesNotExist:
             return None, "Staff member not found in the database."
         except Exception as e:
             return None, f"Authentication error: {str(e)}"
 
-    def get_customer_for_user(self, pk, user):
-        customer = get_object_or_404(Customer, pk=pk)
-        if customer.office != user.office:
-            raise PermissionError("You do not have permission to access this customer.")
-        return customer
 
-    def get(self, request, pk):
+    def get(self, request, customer_id):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            customer = self.get_customer_for_user(pk, user)
+            customer = get_object_or_404(Customer, pk=customer_id)
             serializer = CustomerSerializer(customer)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except PermissionError as pe:
             return Response({"error": str(pe)}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
-            return Response({"error": f"Failed to retrieve customer: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            import traceback
+            traceback.print_exc()  # Print full traceback to logs
+            return Response(
+                {"error": f"Failed to retrieve customer: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-    def put(self, request, pk):
+    def put(self, request, customer_id):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            customer = self.get_customer_for_user(pk, user)
+            customer = get_object_or_404(Customer, pk=customer_id)
             serializer = CustomerSerializer(customer, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
@@ -124,15 +123,15 @@ class CustomerManagementAPIView(BaseAPIView):
         except Exception as e:
             return Response({"error": f"Failed to update customer: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def delete(self, request, pk):
+    def delete(self, request, customer_id):
         user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
 
         try:
-            customer = self.get_customer_for_user(pk, user)
+            customer = get_object_or_404(Customer, pk=customer_id)
             customer.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response(status=status.HTTP_200_OK)
         except PermissionError as pe:
             return Response({"error": str(pe)}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
