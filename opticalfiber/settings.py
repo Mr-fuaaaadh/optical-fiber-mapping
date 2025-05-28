@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'networkdevice_app',
     'customer_app',
     'map_app',
+    'payment_app',
     'channels',
     'corsheaders',
     'rest_framework',
@@ -213,3 +214,5 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 50,
 }
 
+RAZORPAY_KEY_ID = "rzp_test_Et42z7W3O2fqxX"
+RAZORPAY_KEY_SECRET = "0SzesXHaLolGsw99JmP3DvXg"
