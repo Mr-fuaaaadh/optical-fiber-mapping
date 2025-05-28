@@ -25,7 +25,7 @@ class Staff(models.Model):
         ('engineer', 'Engineer'),
     )
 
-    company = models.ForeignKey('Company', on_delete=models.CASCADE, related_name='staffs')
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='staffs')
     name = models.CharField(max_length=100)
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=128)  # Store hashed password
