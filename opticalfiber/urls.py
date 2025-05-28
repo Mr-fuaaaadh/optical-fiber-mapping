@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/network-device/', include('networkdevice_app.urls')),  # Network device data
     path('api/customer/', include('customer_app.urls')),          # Customer info
     path('api/map/', include('map_app.urls')),                    # Map-related endpoints
+    path('api/payment/',include('payment_app.urls'))
 ]
 
 if settings.DEBUG:
