@@ -99,19 +99,37 @@ class FiberRouteManagementView(BaseAPIView):
             return error_response
 
         try:
-            fiber_route = get_object_or_404(FiberRoute, id=fiber_route_id, office__company_id=company_id)
+            fiber_route = FiberRoute.objects.filter(pk=fiber_route_id, office__company_id=company_id).first()
+
+            if not fiber_route:
+                logger.warning("Fiber route ID %s not found or access denied for company %s", fiber_route_id, company_id)
+                return Response(
+                    {"error": "Fiber route not found or you do not have permission to delete it"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
             fiber_route.delete()
 
             logger.info("Fiber route ID %s deleted by company %s", fiber_route_id, company_id)
-            return Response({"message": "Fiber route deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+            return Response(
+                {"message": "Fiber route deleted successfully"},
+                status=status.HTTP_204_NO_CONTENT
+            )
 
         except DatabaseError as db_err:
             logger.error("Database error while deleting fiber route %s: %s", fiber_route_id, db_err)
-            return self.error_response("A database error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "A database error occurred"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
         except Exception as e:
             logger.exception("Unexpected error deleting fiber route %s: %s", fiber_route_id, e)
-            return self.error_response("An unexpected error occurred", status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {"error": "An unexpected error occurred"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
     def put(self, request, fiber_route_id):
         company_id, error_response = self._get_authenticated_company(request)

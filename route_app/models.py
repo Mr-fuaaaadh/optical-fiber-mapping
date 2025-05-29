@@ -29,7 +29,6 @@ class FiberRoute(models.Model):
 
         total_km += self.length_km
 
-        print(f"DEBUG: Total fiber length (including current): {total_km} km")
 
         # Calculate how much km is beyond the first free 500 km
         paid_km = total_km - 500
