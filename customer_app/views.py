@@ -4,11 +4,17 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db import IntegrityError
 from rest_framework.exceptions import ValidationError
+from django.http import Http404
+from django.core.exceptions import ObjectDoesNotExist
 from .models import Customer
 from opticalfiber_app.views import BaseAPIView
 from opticalfiber_app.models import Staff
 from .serializers import CustomerSerializer
 from office.models import Office
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 class CustomerAPIView(BaseAPIView):
     """
@@ -88,23 +94,31 @@ class CustomerManagementAPIView(CustomerAPIView):
 
 
     def get(self, request, customer_id):
-        user, error = self.get_authenticated_user(request)
-        if error:
-            return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
+        # Authenticate user
+        user, auth_error = self.get_authenticated_user(request)
+        if auth_error:
+            logger.warning(f"Unauthorized access attempt: {auth_error}")
+            return Response({"error": auth_error}, status=status.HTTP_401_UNAUTHORIZED)
 
+        # Fetch customer safely
         try:
             customer = get_object_or_404(Customer, pk=customer_id)
+        except (Http404, ObjectDoesNotExist):
+            logger.info(f"Customer with ID {customer_id} not found")
+            return Response({"error": "Customer not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Serialize and return customer data with error handling
+        try:
             serializer = CustomerSerializer(customer)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        except PermissionError as pe:
-            return Response({"error": str(pe)}, status=status.HTTP_403_FORBIDDEN)
-        except Exception as e:
-            import traceback
-            traceback.print_exc()  # Print full traceback to logs
-            return Response(
-                {"error": f"Failed to retrieve customer: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        except OSError as ose:
+            logger.error(f"OSError while serializing customer ID {customer_id}: {str(ose)}")
+            return Response({"error": "Internal server error occurred while processing customer data."},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as ex:
+            logger.error(f"Unexpected error while retrieving customer ID {customer_id}: {traceback.format_exc()}")
+            return Response({"error": "An unexpected error occurred. Please try again later."},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def put(self, request, customer_id):
         user, error = self.get_authenticated_user(request)
