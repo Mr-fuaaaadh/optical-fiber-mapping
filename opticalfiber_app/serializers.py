@@ -26,4 +26,4 @@ class StaffLoginSerializer(serializers.Serializer):
 class StaffProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Staff
-        fields = ['id','name', 'email',]
+        fields = ['id','name', 'email','profile_picture']
