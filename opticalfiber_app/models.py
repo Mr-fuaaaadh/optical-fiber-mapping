@@ -30,6 +30,7 @@ class Staff(models.Model):
     email = models.EmailField(unique=True)
     password = models.CharField(max_length=128)  # Store hashed password
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    profile_picture = models.ImageField(upload_to='staff_profiles/', blank=True, null=True)
 
     is_active = models.BooleanField(default=True)
     joined_on = models.DateField(auto_now_add=True)
