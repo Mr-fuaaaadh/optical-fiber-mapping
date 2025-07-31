@@ -24,9 +24,7 @@ class NetworkDeviceListCreateAPIView(BaseAPIView):
     def get_authenticated_user(self, request):
         try:
             auth_user = self.authentication(request) 
-            print(f"Authenticated user: {auth_user}")
             user_id = auth_user.get('id')
-            print(f"Authenticated user ID: {user_id}")
             if not user_id:
                 return None, "Unauthorized access"
 
@@ -40,10 +38,7 @@ class NetworkDeviceListCreateAPIView(BaseAPIView):
 
     def get(self, request, *args, **kwargs):
         auth_user, error = self.get_authenticated_user(request)
-        print(f"Authenticated user: {auth_user}")
-        print(f"Error: {error}")
         if error:
-            print(f"Authentication error: {error}")
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
 
         try:

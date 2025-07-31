@@ -50,10 +50,8 @@ class BaseAPIView(APIView):
             
             try:
                 decoded_token = jwt.decode(auth_user, settings.SECRET_KEY, algorithms=['HS256'])
-                print(f"Decoded token: {decoded_token}")
                 if 'id' not in decoded_token:
                     return Response({"detail": "Token has no id"}, status=status.HTTP_401_UNAUTHORIZED)
-                print(f"Decoded token: {decoded_token}")
                 return decoded_token
             except jwt.ExpiredSignatureError:
                 return Response({"Token has expired."}, status=status.HTTP_401_UNAUTHORIZED)
