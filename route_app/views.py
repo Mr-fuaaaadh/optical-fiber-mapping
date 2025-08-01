@@ -14,6 +14,8 @@ from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from office.models import Office
 from rest_framework import status, generics
+from django.db.models import Sum
+
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +71,7 @@ class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
 class FiberRouteListView(BaseAPIView):
     """
     Retrieves a list of Fiber Routes for the authenticated user's company, using Redis cache.
+    Includes total length in km.
     """
     def get(self, request, pk):
         try:
@@ -78,18 +81,22 @@ class FiberRouteListView(BaseAPIView):
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
             office = get_object_or_404(Office, pk=pk)
-            if not office:
-                return self.error_response("office information missing", status.HTTP_400_BAD_REQUEST)
 
-            # Fetch from DB if not cached
-            fiber_routes = FiberRoute.objects.filter(office=office)
+            # Fetch fiber routes
+            fiber_routes = FiberRoute.objects.filter(office=office, is_deleted=False)
             if not fiber_routes.exists():
-                return self.error_response("No fiber routes found for this company", status.HTTP_404_NOT_FOUND)
+                return self.error_response("No fiber routes found for this office", status.HTTP_404_NOT_FOUND)
 
             serializer = FiberRouteSerializer(fiber_routes, many=True)
             serialized_data = serializer.data
 
-            return Response(serialized_data, status=status.HTTP_200_OK)
+            # Calculate total km
+            total_km = fiber_routes.aggregate(total=Sum('length_km'))['total'] or 0
+
+            return Response({
+                "fiber_routes": serialized_data,
+                "total_km": round(total_km, 2)
+            }, status=status.HTTP_200_OK)
 
         except (ObjectDoesNotExist, DatabaseError) as e:
             logger.exception("Database-related error in FiberRouteListView")
