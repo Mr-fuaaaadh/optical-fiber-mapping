@@ -1,5 +1,7 @@
 import logging
 from django.db import DatabaseError
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.response import Response
 from rest_framework import status
@@ -47,7 +49,10 @@ class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
             return self.handle_exception(e)
 
     def perform_create(self, serializer):
-        serializer.save()
+        try:
+            serializer.save()
+        except DjangoValidationError as e:
+            raise DRFValidationError(e.messages)
 
 
 
