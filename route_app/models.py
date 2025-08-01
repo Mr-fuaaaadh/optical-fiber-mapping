@@ -18,8 +18,10 @@ class FiberRoute(models.Model):
 
     def clean(self):
         from payment_app.models import Payment
+        from decimal import Decimal
 
         company = self.office.company.pk
+
         total_km = FiberRoute.objects.filter(
             office__company=company,
             is_deleted=False
@@ -27,19 +29,25 @@ class FiberRoute(models.Model):
             total=models.Sum('length_km')
         )['total'] or 0
 
-        total_km += self.length_km
-
+        total_km = Decimal(total_km) + Decimal(self.length_km)
 
         # Calculate how much km is beyond the first free 500 km
-        paid_km = total_km - 500
+        free_limit = Decimal('500')
+        paid_km = total_km - free_limit
+
         if paid_km <= 0:
-            # still in free zone, no payment required
+            # Just reached the 500 km limit?
+            if total_km == free_limit:
+                raise ValidationError(
+                    f"You have now reached the 500 km free fiber route limit. "
+                    f"Any further addition will require payment."
+                )
+            # Still under free limit — allow
             return
 
-        # Calculate how many 500 km chunks require payment
+        # Now check if enough payments are made
         required_chunks = int(paid_km // 500) + (1 if paid_km % 500 else 0)
 
-        # Count how many payments have been made successfully
         paid_chunks = Payment.objects.filter(
             company=company,
             status='success',
@@ -48,11 +56,11 @@ class FiberRoute(models.Model):
 
         if required_chunks > paid_chunks:
             raise ValidationError(
-                f"Fiber length limit exceeded. "
-                f"Total fiber: {total_km} km. "
-                f"Payment required for {required_chunks} chunks, "
-                f"but only {paid_chunks} payments found."
+                f"Fiber length limit exceeded. Total fiber: {total_km} km. "
+                f"Free limit: 500 km. Payment required for {required_chunks} chunk(s) "
+                f"({required_chunks * 500 + 500} km total), but only {paid_chunks} payment(s) found."
             )
+
 
 
 
