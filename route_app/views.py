@@ -14,10 +14,6 @@ from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from office.models import Office
 from rest_framework import status, generics
-from opticalfiber_app.models import Staff
-from django.db.models import Sum
-
-
 
 
 logger = logging.getLogger(__name__)
@@ -89,20 +85,11 @@ class FiberRouteListView(BaseAPIView):
             fiber_routes = FiberRoute.objects.filter(office=office)
             if not fiber_routes.exists():
                 return self.error_response("No fiber routes found for this company", status.HTTP_404_NOT_FOUND)
-            
-            company = office.company.pk
-
-            routes = FiberRoute.objects.filter(
-            office__company=company,
-            is_deleted=False
-           )
-            total_km = routes.aggregate(total=Sum('length_km'))['total'] or 0
 
             serializer = FiberRouteWithTotalSerializer(fiber_routes, many=True)
             serialized_data = serializer.data
 
             return Response(serialized_data, status=status.HTTP_200_OK)
-            
 
         except (ObjectDoesNotExist, DatabaseError) as e:
             logger.exception("Database-related error in FiberRouteListView")
