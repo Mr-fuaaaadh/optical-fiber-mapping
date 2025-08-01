@@ -54,7 +54,7 @@ class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
             )
 
         except DRFValidationError as e:
-            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
+            return Response({"message": e.detail}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return self.handle_exception(e)
 
