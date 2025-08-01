@@ -11,37 +11,44 @@ from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from office.models import Office
+from rest_framework import status, generics
+
 
 logger = logging.getLogger(__name__)
 
-class FiberRouteView(BaseAPIView):
+class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
     """
-    Handles the creation of a new Fiber Route.
+    Create a new fiber route.
     """
-    def post(self, request):
+    serializer_class = FiberRouteSerializer
+    queryset = FiberRoute.objects.all()
+
+    def create(self, request, *args, **kwargs):
         try:
             auth_user = self.authentication(request)
             if not auth_user:
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
-            staff =  get_object_or_404(Staff, pk=auth_user.get('id'))
-            request.data['created_by'] = staff.pk
-            
-            serializer = FiberRouteSerializer(data=request.data)
-            if serializer.is_valid():
-                # Optionally, offload to background task using Celery
-                serializer.save()  # Include creator info if needed
-                return Response(
-                    {"message": "Fiber route is being saved in the background."},
-                    status=status.HTTP_202_ACCEPTED
-                )
-            else:
-                return self.error_response(serializer.errors, status.HTTP_400_BAD_REQUEST)
 
-        except (ValueError, DatabaseError, Exception) as e:
+            staff = get_object_or_404(Staff, pk=auth_user.get("id"))
+            mutable_data = request.data.copy()
+            mutable_data["created_by"] = staff.pk
+
+            serializer = self.get_serializer(data=mutable_data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+
+            return self.success_response(
+                data=serializer.data,
+                message="Fiber route has been created successfully.",
+                status_code=status.HTTP_201_CREATED
+            )
+
+        except Exception as e:
             return self.handle_exception(e)
 
+    def perform_create(self, serializer):
+        serializer.save()
 
-    
 
 
 class FiberRouteListView(BaseAPIView):
