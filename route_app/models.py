@@ -57,8 +57,8 @@ class FiberRoute(models.Model):
         if required_chunks > paid_chunks:
             raise ValidationError(
                 f"Fiber length limit exceeded. Total fiber: {total_km} km. "
-                f"Free limit: 500 km. Payment required for {required_chunks} chunk(s) "
-                f"({required_chunks * 500 + 500} km total), but only {paid_chunks} payment(s) found."
+                # f"Free limit: 500 km. Payment required for {required_chunks} chunk(s) "
+                # f"({required_chunks * 500 + 500} km total), but only {paid_chunks} payment(s) found."
             )
 
 
