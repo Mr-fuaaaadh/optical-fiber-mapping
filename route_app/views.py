@@ -37,7 +37,15 @@ class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
 
             serializer = self.get_serializer(data=mutable_data)
             serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
+
+            # Perform save with model-level validation
+            try:
+                self.perform_create(serializer)
+            except DjangoValidationError as e:
+                return self.error_response(
+                    message=" ".join(e.messages),
+                    status_code=status.HTTP_400_BAD_REQUEST
+                )
 
             return self.success_response(
                 data=serializer.data,
@@ -45,6 +53,8 @@ class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
                 status_code=status.HTTP_201_CREATED
             )
 
+        except DRFValidationError as e:
+            return self.error_response(str(e), status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             return self.handle_exception(e)
 
