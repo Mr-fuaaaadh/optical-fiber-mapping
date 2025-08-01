@@ -6,7 +6,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework.response import Response
 from rest_framework import status
 from opticalfiber_app.views import BaseAPIView
-from .serializers import FiberRouteSerializer
+from .serializers import FiberRouteSerializer,FiberRouteWithTotalSerializer
 from .models import FiberRoute
 from .tasks import * 
 from django.db.models import Prefetch
@@ -14,7 +14,9 @@ from django.shortcuts import get_object_or_404
 from django.core.cache import cache
 from office.models import Office
 from rest_framework import status, generics
+from opticalfiber_app.models import Staff
 from django.db.models import Sum
+
 
 
 
@@ -71,7 +73,6 @@ class FiberRouteCreateView(generics.CreateAPIView, BaseAPIView):
 class FiberRouteListView(BaseAPIView):
     """
     Retrieves a list of Fiber Routes for the authenticated user's company, using Redis cache.
-    Includes total length in km.
     """
     def get(self, request, pk):
         try:
@@ -81,22 +82,27 @@ class FiberRouteListView(BaseAPIView):
                 return self.error_response("Authentication failed", status.HTTP_401_UNAUTHORIZED)
 
             office = get_object_or_404(Office, pk=pk)
+            if not office:
+                return self.error_response("office information missing", status.HTTP_400_BAD_REQUEST)
 
-            # Fetch fiber routes
-            fiber_routes = FiberRoute.objects.filter(office=office, is_deleted=False)
+            # Fetch from DB if not cached
+            fiber_routes = FiberRoute.objects.filter(office=office)
             if not fiber_routes.exists():
-                return self.error_response("No fiber routes found for this office", status.HTTP_404_NOT_FOUND)
+                return self.error_response("No fiber routes found for this company", status.HTTP_404_NOT_FOUND)
+            
+            company = office.company.pk
 
-            serializer = FiberRouteSerializer(fiber_routes, many=True)
+            routes = FiberRoute.objects.filter(
+            office__company=company,
+            is_deleted=False
+           )
+            total_km = routes.aggregate(total=Sum('length_km'))['total'] or 0
+
+            serializer = FiberRouteWithTotalSerializer(fiber_routes, many=True)
             serialized_data = serializer.data
 
-            # Calculate total km
-            total_km = fiber_routes.aggregate(total=Sum('length_km'))['total'] or 0
-
-            return Response({
-                "fiber_routes": serialized_data,
-                "total_km": round(total_km, 2)
-            }, status=status.HTTP_200_OK)
+            return Response(serialized_data, status=status.HTTP_200_OK)
+            
 
         except (ObjectDoesNotExist, DatabaseError) as e:
             logger.exception("Database-related error in FiberRouteListView")
