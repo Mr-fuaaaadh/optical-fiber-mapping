@@ -5,6 +5,8 @@ from django.utils import timezone
 
 
 DEVICE_TYPES = [
+    ('OLT', 'OLT'),
+    ('ONT', 'ONT'),
     ('Splitter', 'Splitter'),
     ('Coupler', 'Coupler'),
     ('Transceiver', 'Transceiver'),
