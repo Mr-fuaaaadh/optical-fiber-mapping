@@ -22,3 +22,9 @@ class Payment(models.Model):
         if not self.valid_until and self.status == 'success':
             self.valid_until = self.payment_date + timezone.timedelta(days=self.duration_days)
         super().save(*args, **kwargs)
+
+
+    @property
+    def is_valid(self):
+        return self.status == "success" and (self.valid_until and timezone.now() <= self.valid_until)
+

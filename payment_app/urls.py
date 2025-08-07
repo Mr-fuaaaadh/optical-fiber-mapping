@@ -1,7 +1,16 @@
 from django.urls import path
-from .views import PaymentRequestAPIView, PaymentResponseAPIView
+from .views import (
+    InitiatePaymentAPI,
+    PaymentCallbackAPI,
+    cashfree_webhook,
+    VerifyPaymentAPI,
+    CheckValidityAPI
+)
 
 urlpatterns = [
-    path('create-payment-order/', PaymentRequestAPIView.as_view(), name='create_payment_order'),
-    path('verify-payment/', PaymentResponseAPIView.as_view(), name='verify_payment'),
+    path('initiate/', InitiatePaymentAPI.as_view()),
+    path('callback/', PaymentCallbackAPI.as_view()),
+    path('webhook/', cashfree_webhook),
+    path('verify/<str:transaction_id>/', VerifyPaymentAPI.as_view()),
+    path('validity/<str:transaction_id>/', CheckValidityAPI.as_view()),
 ]
