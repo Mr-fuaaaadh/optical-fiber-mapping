@@ -39,6 +39,7 @@ def create_cashfree_order(order_id, amount, customer_email, customer_phone, retu
                 "data": response.json()
             }
         else:
+            logger.error(f"Failed to create Cashfree order: {response.status_code} - {response.text}")
             return {
                 "success": False,
                 "error": "Failed to create order",
