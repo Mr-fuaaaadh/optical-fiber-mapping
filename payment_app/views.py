@@ -132,7 +132,14 @@ from .cashfree import verify_webhook_signature
 def cashfree_webhook(request):
     try:
         payload = request.body.decode('utf-8')
+        data = json.loads(payload or "{}")
+
+        # Check if it's a Cashfree dashboard test
+        if data.get("type") == "TEST_WEBHOOK":
+            return Response({"message": "Test webhook received"}, status=200)
+
         signature = request.headers.get('x-webhook-signature')
+        logger.info(f"Received Cashfree webhook with signature: {signature}")
         if not signature:
             return Response({"error": "Signature missing"}, status=400)
 
@@ -141,7 +148,6 @@ def cashfree_webhook(request):
             logger.warning("Invalid Cashfree webhook signature")
             return Response({"error": "Invalid signature"}, status=403)
 
-        data = json.loads(payload)
         order = data.get("order", {})
         order_id = order.get('order_id')
         status_received = order.get('order_status')
@@ -169,6 +175,7 @@ def cashfree_webhook(request):
     except Exception as e:
         logger.error(f"Error processing Cashfree webhook: {str(e)}")
         return Response({"error": "Internal server error"}, status=500)
+
 
 
 class VerifyPaymentAPI(APIView):
