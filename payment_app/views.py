@@ -133,6 +133,8 @@ def cashfree_webhook(request):
     try:
         payload = request.body.decode('utf-8')
         signature = request.headers.get('x-webhook-signature')
+        if not signature:
+            return Response({"error": "Signature missing"}, status=400)
 
         # Signature validation
         if not verify_webhook_signature(payload, signature):
