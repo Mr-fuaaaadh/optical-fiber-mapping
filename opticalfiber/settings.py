@@ -250,3 +250,25 @@ CASHFREE_APP_ID = config("CASHFREE_APP_ID")
 CASHFREE_SECRET_KEY = config("CASHFREE_SECRET_KEY")
 CASHFREE_WEBHOOK_SECRET = config("CASHFREE_WEBHOOK_SECRET")
 CASHFREE_ENV = config("CASHFREE_ENV", default="test").lower()
+
+
+
+CORS_ALLOW_METHODS = [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS"
+]
+
+
+CORS_ALLOW_HEADERS = [
+    "authorization",
+    "content-type",
+    "accept",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with"
+]
