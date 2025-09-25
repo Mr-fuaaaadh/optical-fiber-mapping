@@ -209,13 +209,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# settings.py
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'mail.fiberonix.in'
 EMAIL_PORT = 465
 EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'noreply@fiberonix.in'
-EMAIL_HOST_PASSWORD = 'fiberonix@123!!@@'
+EMAIL_HOST_PASSWORD = 'Corus@2025'
+
+# 👇 Add these
+DEFAULT_FROM_EMAIL = 'Fiberonix <noreply@fiberonix.in>'
+SERVER_EMAIL = 'noreply@fiberonix.in'
+
 
 
 
