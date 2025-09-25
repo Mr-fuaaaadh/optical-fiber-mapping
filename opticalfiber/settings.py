@@ -27,9 +27,23 @@ SECRET_KEY = 'django-insecure-sy^y4xbr-=o5dr0ah#^1dptm*g7^q9i!7q1j=tk_s3ffm#@9--
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "fiberonix.in",
+    "www.fiberonix.in",   # include www version
+    "backend.fiberonix.in",
+    "optical-fiber-mapping.vercel.app",
+    "localhost",
+    "127.0.0.1",
+]
 
-CORS_ALLOWED_ORIGINS = ["http://localhost:8080","https://optical-fiber-mapping.vercel.app","https://fiberonix.in"]
+CORS_ALLOWED_ORIGINS = [
+    "https://fiberonix.in",
+    "https://www.fiberonix.in",   # include www version
+    "https://optical-fiber-mapping.vercel.app",
+    "http://localhost:8080",     
+    "http://127.0.0.1:8080",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 
@@ -110,28 +124,28 @@ WSGI_APPLICATION = 'opticalfiber.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'optical_db',
-#         'USER': 'postgres',
-#         'PASSWORD': '252562',
-#         'HOST': 'localhost',
-#         'PORT': '5432',
-#     }
-# }
-
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'optical_db',
-        'USER': 'optical_user',
+        'USER': 'postgres',
         'PASSWORD': '252562',
         'HOST': 'localhost',
         'PORT': '5432',
     }
 }
+
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'optical_db',
+#         'USER': 'optical_user',
+#         'PASSWORD': '252562',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
 
 
 STATIC_URL = '/static/'
@@ -195,16 +209,15 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
+# settings.py
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_HOST = 'mail.fiberonix.in'
+EMAIL_PORT = 465
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = 'noreply@fiberonix.in'
+EMAIL_HOST_PASSWORD = 'fiberonix@123!!@@'
 
-EMAIL_HOST_USER = 'muhammadfuhad3@gmail.com'
-EMAIL_HOST_PASSWORD = 'imci azii rmjo ssxv'  # App Password (NOT your Gmail login)
 
-
-DEFAULT_FROM_EMAIL = 'Muhammad Fuhad <muhammadfuhad3@gmail.com>'
 
 
 
@@ -252,23 +265,3 @@ CASHFREE_WEBHOOK_SECRET = config("CASHFREE_WEBHOOK_SECRET")
 CASHFREE_ENV = config("CASHFREE_ENV", default="test").lower()
 
 
-
-CORS_ALLOW_METHODS = [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS"
-]
-
-
-CORS_ALLOW_HEADERS = [
-    "authorization",
-    "content-type",
-    "accept",
-    "origin",
-    "user-agent",
-    "x-csrftoken",
-    "x-requested-with"
-]
