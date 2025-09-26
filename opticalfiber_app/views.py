@@ -272,6 +272,29 @@ class EditStaffProfile(BaseAPIView):
 
     
 
+class ChangePasswordView(EditStaffProfile):
+    def post(self, request):
+        staff_instance = self.get_authenticated_staff(request)
+        user_id = staff_instance.id
+        
+        try:
+            staff = Staff.objects.get(id=user_id)
+        except Staff.DoesNotExist:
+            return self.error_response("Staff not found.", status.HTTP_404_NOT_FOUND)
+
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
+
+        if not old_password or not new_password:
+            return self.error_response("Old and new passwords are required.", status.HTTP_400_BAD_REQUEST)
+
+        if not staff.check_password(old_password):
+            return self.error_response("Old password is incorrect.", status.HTTP_400_BAD_REQUEST)
+
+        staff.password = make_password(new_password)
+        staff.save()
+
+        return self.success_response("Password changed successfully.", status_code=status.HTTP_200_OK)
 
 class ForgotPasswordView(BaseAPIView):
     def post(self, request):
