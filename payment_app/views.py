@@ -126,7 +126,9 @@ class PaymentCallbackAPI(APIView):
 
 from rest_framework.decorators import api_view
 from .cashfree import verify_webhook_signature
+from django.views.decorators.csrf import csrf_exempt
 
+@csrf_exempt 
 @api_view(['POST'])
 def cashfree_webhook(request):
     try:
@@ -135,6 +137,9 @@ def cashfree_webhook(request):
 
         if data.get("type") == "TEST_WEBHOOK":
             return Response({"message": "Test webhook received"}, status=200)
+        
+        logger.info(f"Received Cashfree webhook: {data}")
+        
 
         signature = request.headers.get('x-webhook-signature')
         if not signature:
