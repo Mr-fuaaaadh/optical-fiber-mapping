@@ -46,7 +46,7 @@ class BaseAPIView(APIView):
         try:
             auth_user = request.headers.get('Authorization')
             if auth_user is None:
-                return Response({"Authorization token is missing."}, status=status.HTTP_401_UNAUTHORIZED)
+                return Response({"detail": "Authorization token is missing."}, status=401)
             
             try:
                 decoded_token = jwt.decode(auth_user, settings.SECRET_KEY, algorithms=['HS256'])

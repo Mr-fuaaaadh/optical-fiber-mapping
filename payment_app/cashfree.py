@@ -68,8 +68,6 @@ def verify_webhook_signature(payload: str, signature: str) -> bool:
     return hmac.compare_digest(computed, signature)
 
 
-
-
 def verify_cashfree_order(order_id):
     url = f"https://sandbox.cashfree.com/pg/orders/{order_id}" if settings.CASHFREE_ENV == 'TEST' else f"https://api.cashfree.com/pg/orders/{order_id}"
 
