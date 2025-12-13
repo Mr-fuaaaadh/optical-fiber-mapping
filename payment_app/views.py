@@ -4,22 +4,20 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 from django.conf import settings
-from django.views.decorators.csrf import csrf_exempt
 from .models import Payment
+from .serializers import PaymentCreateSerializer, PaymentSerializer
 from .cashfree_async import create_cashfree_order, verify_cashfree_order, verify_webhook_signature
-from rest_framework.decorators import api_view, permission_classes, authentication_classes
-from rest_framework.permissions import AllowAny
 import uuid
 import logging
 import json
 import asyncio
 from opticalfiber_app.models import Staff
+import requests
 
 logger = logging.getLogger(__name__)
 
 class InitiatePaymentAPI(BaseAPIView):
-    def post(self, request): 
-
+    def post(self, request):
         auth_user, error = self.get_authenticated_user(request)
         if error:
             return Response({"error": error}, status=status.HTTP_400_BAD_REQUEST)
@@ -29,8 +27,10 @@ class InitiatePaymentAPI(BaseAPIView):
         email = auth_user.email
         phone = request.data.get('phone')
 
-        if not phone or not amount:
-            return Response({"error": "Phone number & amount required"}, status=400)
+        if not phone:
+            return Response({"error": "Phone number required"}, status=400)
+        if not amount:
+            return Response({"error": "Amount is required"}, status=400)
 
         transaction_id = str(uuid.uuid4())
         return_url = f"https://backend.fiberonix.in/api/payment/callback/?transaction_id={transaction_id}"
@@ -49,7 +49,7 @@ class InitiatePaymentAPI(BaseAPIView):
             data = response['data']
             payment.order_id = data.get('order_id')
             payment.payment_session_id = data.get('payment_session_id')
-            payment.save()
+            payment.save(update_fields=['order_id','payment_session_id'])
             return Response({
                 "payment_link": data["payments"]["url"],
                 "order_id": data.get('order_id'),
@@ -58,7 +58,7 @@ class InitiatePaymentAPI(BaseAPIView):
             }, status=200)
         else:
             payment.status = 'failed'
-            payment.save()
+            payment.save(update_fields=['status'])
             return Response({
                 "error": "Failed to create order",
                 "details": response.get('details')
@@ -77,7 +77,7 @@ class InitiatePaymentAPI(BaseAPIView):
         except Exception as e:
             return None, f"An error occurred while fetching staff details: {str(e)}"
 
-
+        
 
 
 
@@ -86,92 +86,84 @@ class PaymentCallbackAPI(APIView):
         transaction_id = request.GET.get('transaction_id')
         if not transaction_id:
             return Response({"error": "Missing transaction_id"}, status=400)
-
         payment = Payment.objects.filter(transaction_id=transaction_id).first()
         if not payment:
             return Response({"error": "Invalid transaction ID"}, status=404)
-
-        # Callback: just show current status from DB
-        status_map = {
-            "pending": "Payment pending. Please wait for confirmation.",
-            "success": "Payment successful and verified.",
-            "failed": "Payment failed. Please retry."
+        url = f"https://sandbox.cashfree.com/pg/orders/{transaction_id}" if settings.CASHFREE_ENV == 'test' else f"https://api.cashfree.com/pg/orders/{transaction_id}"
+        headers = {
+            "x-api-version": "2022-09-01",
+            "x-client-id": settings.CASHFREE_APP_ID,
+            "x-client-secret": settings.CASHFREE_SECRET_KEY,
         }
+        try:
+            resp = requests.get(url, headers=headers, timeout=10)
+            data = resp.json()
+        except Exception as e:
+            return Response({"error": "Error verifying payment", "details": str(e)}, status=500)
+        order_status = data.get('order_status', '').upper()
+        if order_status == 'PAID':
+            if payment.status != 'success':
+                payment.status = 'success'
+                payment.valid_until = payment.payment_date + timezone.timedelta(days=payment.duration_days)
+                payment.save()
+            return Response({"message": "Payment successful and verified"}, status=200)
+        elif order_status in ['FAILED', 'EXPIRED']:
+            payment.status = 'failed'
+            payment.save()
+            return Response({"error": f"Payment failed: {order_status}"}, status=400)
+        return Response({"message": f"Payment is still {order_status}"}, status=202)
 
-        return Response({
-            "transaction_id": transaction_id,
-            "status": payment.status,
-            "message": status_map.get(payment.status, "Status unknown"),
-            "valid_until": payment.valid_until
-        }, status=200)
+from rest_framework.decorators import api_view
+from django.views.decorators.csrf import csrf_exempt
 
-    
 @csrf_exempt
 @api_view(['POST'])
-@authentication_classes([])
-@permission_classes([AllowAny])
 def cashfree_webhook(request):
     try:
-        payload = request.body.decode("utf-8")
+        payload = request.body.decode('utf-8')
         data = json.loads(payload or "{}")
-        logger.info(f"Cashfree Webhook Received: {data}")
-
         if data.get('type') == 'TEST_WEBHOOK':
             return Response({"message": "Test webhook received"}, status=200)
-
-        signature = request.headers.get("x-webhook-signature")
-        if not signature or not verify_webhook_signature(payload, signature):
-            logger.warning("Invalid or missing webhook signature")
-            return Response({"message": "Invalid signature"}, status=200)
-
-        order = data.get("data", {}).get("order", {})
-        order_id = order.get("order_id")
-        status_received = order.get("order_status")
+        logger.info(f"Received Cashfree webhook: {data}")
+        signature = request.headers.get('x-webhook-signature')
+        if not signature:
+            return Response({"error": "Signature missing"}, status=400)
+        if not verify_webhook_signature(payload, signature):
+            return Response({"error": "Invalid signature"}, status=403)
+        order = data.get('data', {}).get('order', {})
+        status_received = order.get('order_status')
+        order_id = order.get('order_id')
         if not order_id or not status_received:
-            return Response({"message": "Invalid payload"}, status=200)
-
+            return Response({"error": "Invalid payload"}, status=400)
         payment = Payment.objects.filter(transaction_id=order_id).first()
         if not payment:
-            logger.warning(f"Payment not found: {order_id}")
-            return Response({"message": "Payment not found"}, status=200)
-
-        if status_received == "PAID" and payment.status != "success":
-            payment.status = "success"
+            return Response({"error": "Transaction not found"}, status=404)
+        if status_received == 'PAID' and payment.status != 'success':
+            payment.status = 'success'
             payment.valid_until = payment.payment_date + timezone.timedelta(days=payment.duration_days)
-            payment.save(update_fields=["status", "valid_until"])
-        elif status_received in ["FAILED", "CANCELLED", "EXPIRED"] and payment.status != "failed":
-            payment.status = "failed"
-            payment.save(update_fields=["status"])
-
-        return Response({"message": "Webhook processed"}, status=200)
-
-    except Exception:
-        logger.exception("Cashfree webhook error")
-        return Response({"message": "Webhook error"}, status=200)
-
-
-    
-
+            payment.save()
+        elif status_received in ['FAILED', 'CANCELLED', 'EXPIRED']:
+            payment.status = 'failed'
+            payment.save()
+        return Response({"message": "Webhook processed successfully"}, status=200)
+    except Exception as e:
+        logger.error(f"Error processing Cashfree webhook: {str(e)}")
+        return Response({"error": "Internal server error"}, status=500)
 
 class VerifyPaymentAPI(APIView):
     def get(self, request, transaction_id):
         payment = Payment.objects.filter(transaction_id=transaction_id).first()
         if not payment:
             return Response({"error": "Invalid transaction ID"}, status=404)
-
-        # Synchronous call instead of asyncio.run()
-        response = verify_cashfree_order(transaction_id)  # should return dict
-
+        response = asyncio.run(verify_cashfree_order(transaction_id))
         if response.get('order_status') == 'PAID' and payment.status != 'success':
             payment.status = 'success'
             payment.valid_until = payment.payment_date + timezone.timedelta(days=payment.duration_days)
-            payment.save(update_fields=["status", "valid_until"])
-
+            payment.save()
         return Response({
             "status": payment.status,
             "valid_until": payment.valid_until,
         })
-
 
 class CheckValidityAPI(APIView):
     def get(self, request, transaction_id):
