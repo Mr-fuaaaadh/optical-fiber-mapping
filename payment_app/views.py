@@ -28,6 +28,7 @@ class InitiatePaymentAPI(BaseAPIView):
 
         if not amount or not phone:
             return Response({"error": "Amount and phone required"}, status=400)
+
         transaction_id = str(uuid.uuid4())
 
         payment = Payment.objects.create(
@@ -37,6 +38,7 @@ class InitiatePaymentAPI(BaseAPIView):
             status="pending",
             payment_method="cashfree",
         )
+
         return_url = f"{settings.CASHFREE_RETURN_URL}?transaction_id={transaction_id}"
 
         try:
@@ -54,10 +56,13 @@ class InitiatePaymentAPI(BaseAPIView):
 
             return Response(
                 {
-                    "payment_link": data["payments"]["url"],
+                    "payment_session_id": data["payment_session_id"],
+                    "order_id": data["order_id"],
                     "transaction_id": transaction_id,
-                }
+                },
+                status=200
             )
+
         except Exception as e:
             payment.mark_failed()
             return Response({"error": str(e)}, status=500)
