@@ -8,7 +8,7 @@ BASE_URL = "https://sandbox.cashfree.com/pg" if settings.CASHFREE_ENV == "test" 
 
 HEADERS = {
     "Content-Type": "application/json",
-    "x-api-version": "2022-09-01",
+    "x-api-version": "2025-01-01",
     "x-client-id": settings.CASHFREE_APP_ID,
     "x-client-secret": settings.CASHFREE_SECRET_KEY,
 }
