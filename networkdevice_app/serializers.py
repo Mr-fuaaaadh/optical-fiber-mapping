@@ -1,5 +1,6 @@
 from .models import *
 from rest_framework import serializers
+from .models import Design, CouplerCalculation
 
 
 class NetworkDeviceSerializer(serializers.ModelSerializer):
@@ -69,3 +70,37 @@ class DevicePortViewSerializers(serializers.ModelSerializer):
     class Meta :
         model = NetworkDevice
         fields = "__all__"
+
+
+
+from rest_framework import serializers
+from .models import Design, CouplerCalculation
+
+class CouplerCalculationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CouplerCalculation
+        fields = ["id", "coupler_ratio", "tap_km", "tap_output_dbm", "throughput_km", "through_output_dbm"]
+
+class DesignSerializer(serializers.ModelSerializer):
+    couplers = CouplerCalculationSerializer(many=True)  # nested serializer
+
+    class Meta:
+        model = Design
+        fields = ["id", "name", "input_power", "couplers"]
+
+    def create(self, validated_data):
+        couplers_data = validated_data.pop("couplers", [])
+        company = self.context["company"]  # get logged-in user's company
+        design = Design.objects.create(company=company, **validated_data)
+
+        # create all couplers at once
+        for coupler_data in couplers_data:
+            CouplerCalculation.objects.create(design=design, **coupler_data)
+
+        return design
+    
+
+
+
+
+

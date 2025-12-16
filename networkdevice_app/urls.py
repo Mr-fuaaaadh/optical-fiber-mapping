@@ -14,4 +14,9 @@ urlpatterns = [
     path('deviceport/<int:pk>/update/', DevicePortRetrieveUpdateDestroyAPIView.as_view(), name='deviceport-update'),
     path('deviceport/<int:pk>/delete/', DevicePortRetrieveUpdateDestroyAPIView.as_view(), name='deviceport-delete'),
 
+
+    path("designs/", DesignListCreateAPIView.as_view(), name="design-list-create"),
+    path("designs/<int:pk>/", DesignRetrieveUpdateDestroyAPIView.as_view(), name="design-detail"),
+
+
 ]

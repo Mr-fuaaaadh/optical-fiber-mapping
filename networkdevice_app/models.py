@@ -2,6 +2,7 @@ from django.db import models
 from opticalfiber_app.models import Staff
 from office.models import Office
 from django.utils import timezone
+from opticalfiber_app.models import Company 
 
 
 DEVICE_TYPES = [
@@ -54,4 +55,26 @@ class DevicePort(models.Model):
 
     def __str__(self):
         return f"Port {self.port_number} - {self.device} ({self.port_type})"
+    
+
+
+class Design(models.Model):
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name="designs")
+    name = models.CharField(max_length=100)
+    input_power = models.FloatField()
+
+    def __str__(self):
+        return self.name
+
+
+class CouplerCalculation(models.Model):
+    design = models.ForeignKey(Design, on_delete=models.CASCADE, related_name="couplers")
+    coupler_ratio = models.CharField(max_length=100)
+    tap_km = models.FloatField()
+    tap_output_dbm = models.FloatField()
+    throughput_km = models.FloatField()
+    through_output_dbm = models.FloatField()
+
+    def __str__(self):
+        return f"{self.design.name} - {self.coupler_ratio}"
 

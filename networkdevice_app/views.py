@@ -2,8 +2,8 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import NetworkDevice, DevicePort
-from .serializers import NetworkDeviceSerializer, DevicePortSerializer, DevicePortViewSerializers
+from .models import NetworkDevice, DevicePort, Design, CouplerCalculation
+from .serializers import NetworkDeviceSerializer, DevicePortSerializer, DevicePortViewSerializers, DesignSerializer, CouplerCalculationSerializer
 from opticalfiber_app.views import BaseAPIView
 from opticalfiber_app.models import Staff
 from office.models import Office
@@ -223,4 +223,91 @@ class DevicePortRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         port = port
         port.delete()
         return Response(status=status.HTTP_200_OK)
+    
+
+
+
+class DesignListCreateAPIView(NetworkDeviceListCreateAPIView):
+    """Create Design with multiple CouplerCalculations at the same time"""
+
+    def post(self, request):
+        staff, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=401)
+
+        serializer = DesignSerializer(data=request.data, context={"company": staff.company})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+    def get(self, request):
+        staff, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=401)
+
+        designs = Design.objects.filter(company=staff.company)
+        serializer = DesignSerializer(designs, many=True)
+        return Response(serializer.data, status=200)
+    
+
+
+class DesignRetrieveUpdateDestroyAPIView(APIView):
+    """
+    Retrieve, update, or delete a single Design and its nested CouplerCalculations
+    for the logged-in user's company.
+    """
+
+    def get_authenticated_user(self, request):
+        auth_user = self.authentication(request)
+        user_id = auth_user.get("id")
+        if not user_id:
+            return None, "Unauthorized access"
+        staff = Staff.objects.select_related("company").get(pk=user_id)
+        return staff, None
+
+    def get_object(self, pk, company):
+        try:
+            return Design.objects.prefetch_related("couplers").get(pk=pk, company=company)
+        except Design.DoesNotExist:
+            return None
+
+    def get(self, request, pk):
+        user, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
+
+        design = self.get_object(pk, user.company)
+        if not design:
+            return Response({"error": "Design not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DesignSerializer(design)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def put(self, request, pk):
+        user, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
+
+        design = self.get_object(pk, user.company)
+        if not design:
+            return Response({"error": "Design not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = DesignSerializer(design, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        user, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=status.HTTP_401_UNAUTHORIZED)
+
+        design = self.get_object(pk, user.company)
+        if not design:
+            return Response({"error": "Design not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        design.delete()
+        return Response({"message": "Design deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
     
