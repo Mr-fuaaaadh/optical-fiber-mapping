@@ -21,7 +21,7 @@ class InitiatePaymentAPI(BaseAPIView):
     def post(self, request):
         user, error = self.get_authenticated_user(request)
         if error:
-            return Response({"error": error}, status=400)
+            return Response({"error": error}, status=401)
 
         amount = request.data.get("amount")
         phone = request.data.get("phone")
@@ -69,8 +69,22 @@ class InitiatePaymentAPI(BaseAPIView):
 
     def get_authenticated_user(self, request):
         auth = self.authentication(request)
-        staff = Staff.objects.select_related("company").get(pk=auth["id"])
-        return staff, None
+
+        # ❌ If authentication() returned a Response (error)
+        if isinstance(auth, Response):
+            return None, "Unauthorized"
+
+        user_id = auth.get("id")
+        if not user_id:
+            return None, "Invalid authentication payload"
+
+        try:
+            staff = Staff.objects.select_related("company").get(pk=user_id)
+            return staff, None
+        except Staff.DoesNotExist:
+            return None, "Staff not found"
+
+
 
 
 
@@ -96,25 +110,40 @@ class PaymentCallbackAPI(APIView):
 @csrf_exempt
 @api_view(["POST"])
 def cashfree_webhook(request):
-    payload = request.body.decode()
-    signature = request.headers.get("x-webhook-signature")
+    try:
+        payload = request.body.decode("utf-8")
 
-    if not verify_webhook_signature(payload, signature):
-        return Response({"error": "Invalid signature"}, status=403)
+        if settings.CASHFREE_ENV == "test":
+            data = json.loads(payload)
+            return Response({"message": "Test webhook received"}, status=200)
 
-    data = json.loads(payload)
-    order = data.get("data", {}).get("order", {})
-    order_id = order.get("order_id")
-    status_received = order.get("order_status")
+        # ---- Production verification below ----
+        signature = request.META.get("HTTP_X_WEBHOOK_SIGNATURE")
+        timestamp = request.META.get("HTTP_X_WEBHOOK_TIMESTAMP")
 
-    payment = Payment.objects.filter(order_id=order_id).first()
-    if not payment:
-        return Response({"error": "Payment not found"}, status=404)
+        if not verify_webhook_signature(payload, signature, timestamp):
+            return Response({"error": "Invalid signature"}, status=401)
 
-    if status_received == "PAID":
-        payment.mark_success()
-    elif status_received in ["FAILED", "CANCELLED", "EXPIRED"]:
-        payment.mark_failed()
+        data = json.loads(payload)
 
-    return Response({"message": "Webhook processed"})
+        order = data.get("data", {}).get("order", {})
+        order_id = order.get("order_id")
+        order_status = order.get("order_status")
+
+        payment = Payment.objects.filter(order_id=order_id).first()
+        if not payment:
+            return Response({"message": "Order not found but webhook accepted"}, status=200)
+
+        if order_status == "PAID":
+            payment.mark_success()
+        elif order_status in ["FAILED", "CANCELLED", "EXPIRED"]:
+            payment.mark_failed()
+
+        return Response({"message": "Webhook processed"}, status=200)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+
 
