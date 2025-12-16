@@ -252,7 +252,7 @@ class DesignListCreateAPIView(NetworkDeviceListCreateAPIView):
     
 
 
-class DesignRetrieveUpdateDestroyAPIView(APIView):
+class DesignRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
     """
     Retrieve, update, or delete a single Design and its nested CouplerCalculations
     for the logged-in user's company.
