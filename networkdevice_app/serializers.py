@@ -73,16 +73,28 @@ class DevicePortViewSerializers(serializers.ModelSerializer):
 
 
 
+from django.db import transaction
 from rest_framework import serializers
 from .models import Design, CouplerCalculation
 
+
 class CouplerCalculationSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(required=False)  # IMPORTANT for update
+
     class Meta:
         model = CouplerCalculation
-        fields = ["id", "coupler_ratio", "tap_km", "tap_output_dbm", "throughput_km", "through_output_dbm"]
+        fields = [
+            "id",
+            "coupler_ratio",
+            "tap_km",
+            "tap_output_dbm",
+            "throughput_km",
+            "through_output_dbm",
+        ]
+
 
 class DesignSerializer(serializers.ModelSerializer):
-    couplers = CouplerCalculationSerializer(many=True)  # nested serializer
+    couplers = CouplerCalculationSerializer(many=True)
 
     class Meta:
         model = Design
@@ -90,14 +102,52 @@ class DesignSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         couplers_data = validated_data.pop("couplers", [])
-        company = self.context["company"]  # get logged-in user's company
+        company = self.context["company"]
+
         design = Design.objects.create(company=company, **validated_data)
 
-        # create all couplers at once
         for coupler_data in couplers_data:
-            CouplerCalculation.objects.create(design=design, **coupler_data)
+            CouplerCalculation.objects.create(
+                design=design, **coupler_data
+            )
 
         return design
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        couplers_data = validated_data.pop("couplers", [])
+
+        instance.name = validated_data.get("name", instance.name)
+        instance.input_power = validated_data.get(
+            "input_power", instance.input_power
+        )
+        instance.save()
+
+        existing_couplers = {
+            coupler.id: coupler
+            for coupler in instance.couplers.all()
+        }
+
+        sent_ids = []
+
+        for coupler_data in couplers_data:
+            coupler_id = coupler_data.get("id")
+
+            if coupler_id and coupler_id in existing_couplers:
+                coupler = existing_couplers[coupler_id]
+                for attr, value in coupler_data.items():
+                    setattr(coupler, attr, value)
+                coupler.save()
+                sent_ids.append(coupler_id)
+            else:
+                CouplerCalculation.objects.create(
+                    design=instance, **coupler_data
+                )
+
+        instance.couplers.exclude(id__in=sent_ids).delete()
+
+        return instance
+
     
 
 

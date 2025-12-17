@@ -263,12 +263,18 @@ class DesignRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
         user_id = auth_user.get("id")
         if not user_id:
             return None, "Unauthorized access"
-        staff = Staff.objects.select_related("company").get(pk=user_id)
-        return staff, None
+
+        try:
+            staff = Staff.objects.select_related("company").get(pk=user_id)
+            return staff, None
+        except Staff.DoesNotExist:
+            return None, "Staff not found"
 
     def get_object(self, pk, company):
         try:
-            return Design.objects.prefetch_related("couplers").get(pk=pk, company=company)
+            return Design.objects.prefetch_related("couplers").get(
+                pk=pk, company=company
+            )
         except Design.DoesNotExist:
             return None
 
@@ -279,7 +285,10 @@ class DesignRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
 
         design = self.get_object(pk, user.company)
         if not design:
-            return Response({"error": "Design not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Design not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         serializer = DesignSerializer(design)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -291,13 +300,25 @@ class DesignRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
 
         design = self.get_object(pk, user.company)
         if not design:
-            return Response({"error": "Design not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Design not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
-        serializer = DesignSerializer(design, data=request.data)
+        serializer = DesignSerializer(
+            design,
+            data=request.data,
+            context={"company": user.company}
+        )
+
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
     def delete(self, request, pk):
         user, error = self.get_authenticated_user(request)
@@ -306,8 +327,14 @@ class DesignRetrieveUpdateDestroyAPIView(NetworkDeviceListCreateAPIView):
 
         design = self.get_object(pk, user.company)
         if not design:
-            return Response({"error": "Design not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Design not found"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
         design.delete()
-        return Response({"message": "Design deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+        return Response(
+            {"message": "Design deleted successfully"},
+            status=status.HTTP_204_NO_CONTENT
+        )
     
