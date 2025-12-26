@@ -31,22 +31,22 @@ class FiberRoute(models.Model):
 
         total_km = Decimal(total_km) + Decimal(self.length_km)
 
-        # Calculate how much km is beyond the first free 500 km
-        free_limit = Decimal('500')
+        # Calculate how much km is beyond the first free 50 km
+        free_limit = Decimal('50')
         paid_km = total_km - free_limit
 
         if paid_km <= 0:
-            # Just reached the 500 km limit?
+            # Just reached the 50 km limit?
             if total_km == free_limit:
                 raise ValidationError(
-                    f"You have now reached the 500 km free fiber route limit. "
+                    f"You have now reached the 50 km free fiber route limit. "
                     f"Any further addition will require payment."
                 )
             # Still under free limit — allow
             return
 
         # Now check if enough payments are made
-        required_chunks = int(paid_km // 500) + (1 if paid_km % 500 else 0)
+        required_chunks = int(paid_km // 50) + (1 if paid_km % 50 else 0)
 
         paid_chunks = Payment.objects.filter(
             company=company,
@@ -57,11 +57,9 @@ class FiberRoute(models.Model):
         if required_chunks > paid_chunks:
             raise ValidationError(
                 f"Fiber length limit exceeded. "
-                # f"Free limit: 500 km. Payment required for {required_chunks} chunk(s) "
-                # f"({required_chunks * 500 + 500} km total), but only {paid_chunks} payment(s) found."
+                # f"Free limit: 50 km. Payment required for {required_chunks} chunk(s) "
+                # f"({required_chunks * 50 + 50} km total), but only {paid_chunks} payment(s) found."
             )
-
-
 
 
     def save(self, *args, **kwargs):

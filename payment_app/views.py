@@ -143,6 +143,44 @@ def cashfree_webhook(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+    
+
+
+class PaymentListAPI(BaseAPIView):
+    def get(self, request):
+        user, error = self.get_authenticated_user(request)
+        if error:
+            return Response({"error": error}, status=401)
+
+        payments = Payment.objects.filter(company=user.company).order_by("-created_at")
+        payment_list = [
+            {
+                "transaction_id": p.transaction_id,
+                "amount": p.amount,
+                "status": p.status,
+                "payment_method": p.payment_method,
+                "created_at": p.created_at,
+            }
+            for p in payments
+        ]
+
+        return Response({"payments": payment_list}, status=200)
+
+    def get_authenticated_user(self, request):
+        auth = self.authentication(request)
+
+        if isinstance(auth, Response):
+            return None, "Unauthorized"
+
+        user_id = auth.get("id")
+        if not user_id:
+            return None, "Invalid authentication payload"
+
+        try:
+            staff = Staff.objects.select_related("company").get(pk=user_id)
+            return staff, None
+        except Staff.DoesNotExist:
+            return None, "Staff not found"
 
 
 
