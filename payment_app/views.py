@@ -147,6 +147,7 @@ def cashfree_webhook(request):
 
 
 class PaymentListAPI(BaseAPIView):
+
     def get(self, request):
         user, error = self.get_authenticated_user(request)
         if error:
@@ -165,7 +166,7 @@ class PaymentListAPI(BaseAPIView):
         ]
 
         return Response({"payments": payment_list}, status=200)
-
+    
     def get_authenticated_user(self, request):
         auth = self.authentication(request)
 
@@ -181,6 +182,7 @@ class PaymentListAPI(BaseAPIView):
             return staff, None
         except Staff.DoesNotExist:
             return None, "Staff not found"
+
 
 
 
